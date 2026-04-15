@@ -1,4 +1,4 @@
-# Marketplace Submission — Ensembra v0.4.0
+# Marketplace Submission — Ensembra v0.5.0
 
 This file contains the exact text and assets to paste into the official Claude Code plugin marketplace submission form at **https://claude.ai/settings/plugins/submit** (or the equivalent at platform.claude.com/plugins/submit).
 
@@ -21,7 +21,7 @@ https://github.com/HotRedMat/ensembra
 ## Form field: Version
 
 ```
-0.4.0
+0.5.0
 ```
 
 ## Form field: License
@@ -197,8 +197,8 @@ https://github.com/HotRedMat/ensembra#readme
 Before clicking submit, verify:
 
 - [ ] Latest main is pushed to `HotRedMat/ensembra`
-- [ ] `v0.4.0` tag exists and points to the release commit
-- [ ] GitHub Release for `v0.4.0` is published
+- [ ] `v0.5.0` tag exists and points to the release commit
+- [ ] GitHub Release for `v0.5.0` is published
 - [ ] `claude plugin validate .` passes locally
 - [ ] `.github/workflows/plugin-validate.yml` CI run is green on main
 - [ ] All 7 PNG icons + 3 screenshots + 1 social preview are committed under `assets/`

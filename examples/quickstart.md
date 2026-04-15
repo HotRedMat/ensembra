@@ -129,13 +129,19 @@ Ensembra will auto-route the security performer to `qwen2.5:14b` and the qa perf
 
 ### Gemini (free tier)
 
-Run the bundled script in any terminal:
-```bash
-ensembra-set-key
-```
-Input is hidden, saved to `~/.config/ensembra/env` (`chmod 600`), and verified with a live Gemini API call. The key never appears in your shell history, clipboard, or Claude Code conversation record.
+Use Claude Code's native plugin configuration UI:
 
-Other commands: `ensembra-set-key --status | --verify | --clear | --help`
+```
+/plugin
+→ ↓ to ensembra
+→ Enter
+→ Configure options
+→ enter your key in the gemini_api_key field (input is hidden)
+→ Save
+→ /reload-plugins
+```
+
+The key is stored in your OS keychain (macOS Keychain, or `~/.claude/.credentials.json` elsewhere). Plaintext never touches disk.
 
 Get a free key at <https://aistudio.google.com/app/apikey>. Default model: `gemini-2.5-flash`. Skip entirely if you don't want Gemini — architect falls back to Claude.
 

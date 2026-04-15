@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/HotRedMat/ensembra/releases"><img src="https://img.shields.io/badge/version-0.4.1-blue" alt="version"/></a>
+  <a href="https://github.com/HotRedMat/ensembra/releases"><img src="https://img.shields.io/badge/version-0.5.0-blue" alt="version"/></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="license"/></a>
   <img src="https://img.shields.io/badge/plugin%20validate-passing-brightgreen" alt="plugin validate"/>
   <img src="https://img.shields.io/badge/verification-end--to--end-brightgreen" alt="verification"/>
@@ -113,60 +113,27 @@ ollama pull qwen2.5:14b llama3.1:8b
 
 ### Gemini setup (optional, for architect)
 
-Ensembra v0.3.0 uses a **hybrid key lookup chain** for maximum compatibility:
+Ensembra v0.5.0 uses Claude Code's native `userConfig` with `sensitive: true`. The key is stored in your OS keychain and accessed via `${user_config.gemini_api_key}` template substitution in the plugin's skills and agents. No workaround paths, no plaintext files.
 
-1. `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` — Claude Code native `userConfig` (OS keychain, future-proof)
-2. `~/.config/ensembra/env` — `chmod 600` file (current workaround for Claude Code 2.x)
-3. Nothing → architect falls back to a Claude sub-agent
-
-**Why two paths?** Claude Code 2.1.109's plugin install flow currently cannot prompt for `sensitive: true` userConfig values. Ensembra declares the `userConfig` field anyway (forward-compatible) and additionally supports a plain env file as a workaround until Claude Code is fixed.
-
-#### Path A: `/plugin → ensembra → Configure options` (native Claude Code UI)
-
-This is the official Claude Code path for setting `userConfig` values. Inside Claude Code run:
+Set the key via the Claude Code plugin UI:
 
 ```
 /plugin
 ```
 
-Use `↓` to move the cursor to `ensembra`, press **Enter** to open the plugin detail view, then look for a **"Configure options"** item and press Enter again. Claude Code will render a dialog with the `gemini_api_key` and `ollama_endpoint` fields from the plugin manifest. The Gemini key field is declared `sensitive: true` so the input is masked and saved to your OS keychain (macOS Keychain, or `~/.claude/.credentials.json` on Linux), not to `settings.json`.
-
-After entering the key:
-
-```
-/reload-plugins
-```
-
-If you can't find the "Configure options" item, fall back to Path B below. Path B works everywhere and does not depend on the Claude Code UI version.
-
-#### Path B: `ensembra-set-key` (script, v0.4.0+)
-
-Ensembra ships a `bin/ensembra-set-key` script that's added to your `$PATH` automatically when the plugin is enabled. Open any terminal and run:
-
-```bash
-ensembra-set-key
-```
-
-The script will:
-
-1. Prompt for your Gemini API key with **input hidden** (echo off, reading from `/dev/tty`)
-2. Save it to `~/.config/ensembra/env` atomically with `chmod 600`
-3. Verify the key with a live Gemini API call
-4. Print success/failure — **the key value is never echoed, logged, or sent to any Claude Code conversation record**
-
-Additional commands:
-```bash
-ensembra-set-key --status   # show current key state (length + preview only)
-ensembra-set-key --verify   # test saved key against the API
-ensembra-set-key --clear    # delete the saved key
-ensembra-set-key --help     # full usage
-```
-
-**Why a separate script?** Claude Code's Bash tool runs as a non-interactive subprocess — it can't forward your terminal's stdin. The `ensembra-set-key` script directly opens `/dev/tty` on its own, so the secret never passes through the Claude Code conversation, shell history, clipboard, or any log. This is the most secure path available in 2026-04.
+Then:
+1. Move the cursor down to `ensembra`
+2. Press **Enter** to open the plugin detail view
+3. Select **"Configure options"**
+4. Enter the key in the `gemini_api_key` field — it's declared `sensitive: true` so input is masked and the value is saved to your OS keychain (macOS Keychain, or `~/.claude/.credentials.json` on other platforms), never to `settings.json`
+5. Save
+6. `/reload-plugins`
 
 **Get a free API key** at <https://aistudio.google.com/app/apikey>. Default model is `gemini-2.5-flash`.
 
-**Leave it unset if you don't want Gemini** — the architect performer falls back to a Claude sub-agent automatically.
+**Leave it unset if you don't want Gemini** — the architect performer falls back to a Claude sub-agent automatically. Ensembra works fully without a key.
+
+**Storage**: Claude Code uses the OS-native secret store. On macOS that's Keychain; on Linux it's Secret Service (gnome-keyring / kwallet) or `~/.claude/.credentials.json`. The plaintext key never touches any file you would accidentally share.
 
 **Get a free API key** at <https://aistudio.google.com/app/apikey>. Default model is `gemini-2.5-flash`.
 

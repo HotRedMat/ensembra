@@ -237,52 +237,61 @@ Performer 는 이종(heterogeneous) 이다. Conductor 는 각 Performer 의 `tra
 3. 블록이 없거나 JSON 파싱 실패 시 Performer 출력을 `status: "error"`, `_error.code: "format"` 로 마킹. §5 에러 규약에 따름.
 4. 자연어 서술은 절대 Conductor 가 재정리하지 않는다. `summary`, `arguments` 는 Performer 가 선언한 그대로 보존.
 
-### 8.4 Gemini 키 취급 (v0.3.0+ 하이브리드)
+### 8.4 Gemini 키 취급 (v0.5.0+ 순수 Claude Code userConfig)
 
-**배경**: v0.2.0 에서 순수 `userConfig` + OS 키체인 방식으로 전환했으나, Claude Code 2.1.109 의 plugin install/enable 이 sensitive userConfig 프롬프트를 제대로 띄우지 못하는 버그가 확인됨. v0.3.0 은 두 경로를 모두 지원하는 **하이브리드** 로 전환.
+**배경**: v0.1.x 에서 v0.4.x 까지 파일 폴백·bin 스크립트 등 다양한 워크어라운드를 시도했으나, Claude Code 2.1.109 바이너리 리버싱으로 **sensitive userConfig 가 실제로 완전 구현되어 있음** 을 확인. v0.5.0 은 **순수 Claude Code userConfig + OS 키체인 단일 경로** 로 회귀.
 
-**조회 체인** (우선순위 순):
+**저장**:
+- `plugin.json` 에 `userConfig.gemini_api_key` (`type: "string"`, `sensitive: true`) 선언
+- Claude Code 가 자동으로 OS 키체인 저장 (macOS Keychain / Windows Credential Manager / Linux Secret Service / `~/.claude/.credentials.json`)
+- 디스크 평문 저장 없음
 
-1. `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` 환경변수
-   - Claude Code 가 `userConfig.gemini_api_key` (`sensitive: true`) 로부터 hook subprocess 에 주입
-   - OS 키체인 저장 (macOS Keychain 또는 `~/.claude/.credentials.json`)
-   - **⚠ 중요**: Claude Code 2.1.109 의 바이너리 리버싱 결과 이 환경변수는 **hooks 전용** 으로 주입된다. 일반 skills/agents 의 Bash 도구 환경에는 주입되지 않음. 따라서 현재 step 1 은 hooks 기반 경로에서만 작동하며, skills 에서 직접 읽기는 불가. skills 에선 `${user_config.KEY}` 템플릿 치환으로 값을 얻어야 함 (Gate3 이월: skills 의 user_config 치환 실제 동작 확인 + 구현)
-2. `~/.config/ensembra/env` 파일의 `GEMINI_API_KEY=...`
-   - `chmod 600` 강제
-   - 디스크 저장 (파일시스템 권한 기반 보호)
-   - **현재 skills 에서 작동하는 유일한 경로**
-   - `bin/ensembra-set-key` 스크립트 (v0.4.0+) 로 안전하게 설정
-3. 둘 다 없음 → architect Performer 는 Claude 서브에이전트로 폴백
+**설정 경로** (사용자):
 
-**전송**:
-```bash
-GEMINI_KEY="$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY"
-[ -z "$GEMINI_KEY" ] && [ -f ~/.config/ensembra/env ] && \
-  source ~/.config/ensembra/env && GEMINI_KEY="$GEMINI_API_KEY"
-curl -H "x-goog-api-key: $GEMINI_KEY" ...
-unset GEMINI_KEY GEMINI_API_KEY  # 호출 후 정리
+```
+1. /plugin                            (Claude Code 세션 내부)
+2. ↓ 로 ensembra 선택
+3. Enter                              (상세 화면 진입)
+4. "Configure options" 서브메뉴 선택 → Enter
+5. dialog 에 gemini_api_key 입력 (sensitive 이므로 입력 masking)
+6. Save
+7. /reload-plugins
 ```
 
-**설정 경로** (사용자 관점):
-- **권장 (v0.4.0+)**: 어떤 터미널에서든 `ensembra-set-key` 실행
-  - 플러그인의 `bin/` 디렉토리가 Claude Code 에 의해 자동 PATH 주입
-  - 스크립트가 `/dev/tty` 에서 echo 꺼진 입력을 받음 → Claude Code Bash 도구 stdin 제약 구조적 우회
-  - atomic write 로 `~/.config/ensembra/env` 생성 (`chmod 600`)
-  - 실제 Gemini API 호출로 즉시 검증
-  - **대화 히스토리·쉘 히스토리·클립보드 어디에도 키 미기록**
-  - 서브커맨드: `--status` / `--verify` / `--clear` / `--help`
-- **Deprecated (v0.3.0 방식)**: Claude Code 대화창에 키 붙여넣기 — `~/.claude/history.jsonl` 유출 위험으로 v0.4.0 이후 비권장
+**참조 방법** (스킬·에이전트·훅):
+- 스킬·에이전트 본문: `${user_config.gemini_api_key}` 템플릿 치환
+- 훅 subprocess: `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` 환경변수
+
+**전송 예시**:
+```bash
+curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${user_config.gemini_api_key}" \
+  -H 'Content-Type: application/json' -d "$payload"
+```
+
+**빈 값 처리**:
+- 키 미설정 시 architect Performer 는 Claude 서브에이전트로 폴백
+- Conductor 가 `⚠ architect: gemini → claude-sonnet (fallback)` 배지 표시
+- 파이프라인 완전 작동
 
 **로그 마스킹**: `x-goog-api-key`, `Authorization`, `key=`, `CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY`, `user_config.gemini_api_key`, `GEMINI_API_KEY` 전부 `[REDACTED]`
 
-**커밋 금지**: `.gitignore` 의 `.env*` 규칙이 `~/.config/ensembra/env` 를 직접 커버하진 않지만, 해당 파일은 레포 외부 사용자 홈에 있으므로 레포 커밋과 무관.
+**제거된 경로** (v0.5.0 에서 모두 제거):
+- `~/.config/ensembra/env` 파일 폴백
+- `bin/ensembra-set-key` 스크립트
+- `/ensembra:config → 5) c)` 에서 대화창 키 붙여넣기
+- `/ensembra:config → 5) c)` 에서 인터랙티브 파일 쓰기
 
 **이전 버전 참고**:
-- v0.1.x: env 파일 방식 (단일 소스)
-- v0.2.x: userConfig 단일 소스 (설치 불가 버그로 실패)
-- v0.3.x: 하이브리드 (userConfig 선언 유지 + env 파일 폴백)
+- v0.1.x: env 파일 단일 소스
+- v0.2.x: userConfig 단일 소스 시도 (스키마 결함 + Claude Code 이해 부족으로 실패 판단)
+- v0.3.x: 하이브리드 (userConfig + env 파일)
+- v0.4.x: 하이브리드 + `bin/ensembra-set-key` 편의 스크립트
+- **v0.5.0**: 순수 userConfig 복귀. 바이너리 리버싱으로 Claude Code 실제 규격 확인 (`sensitive: true` 완전 구현, `/plugin → Configure options` UI 경로 존재) 후 모든 워크어라운드 제거.
 
-**`TODO(gate3)`**: Claude Code 가 2.x 이후 버전에서 userConfig 버그를 고치면, env 파일 폴백을 deprecation 경로로 전환하고 v0.4.0 에서 완전 제거 검토.
+**마이그레이션**: v0.1.x~v0.4.x 에서 `~/.config/ensembra/env` 파일을 사용하던 사용자는:
+1. 해당 파일 수동 삭제: `rm -rf ~/.config/ensembra`
+2. `/plugin → ensembra → Configure options` 에서 키 재설정
+3. `/reload-plugins`
 
 ### 8.5 라운드 피로도 대응
 

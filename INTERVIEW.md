@@ -255,6 +255,27 @@ ensembra/
   - 메인 메뉴 8개 + 서브메뉴, 상세 `CONTRACT.md` §14
   - **근거**: Claude Code `/config` 와 동일한 UX 일관성. 1인 개발자가 플래그·JSON 문법을 외울 필요 없음. 모든 런타임 결정을 한 곳에 집중.
 
+- **2026-04-16 — v0.5.0 순수 userConfig 복귀 (모든 워크어라운드 제거)**
+  - 리버싱으로 확인된 Claude Code 실제 규격을 신뢰하여 v0.3.x~v0.4.x 의 하이브리드 설계 전체를 폐기
+  - **제거 대상**:
+    - `bin/ensembra-set-key` 스크립트 및 `bin/` 디렉토리 전체
+    - `~/.config/ensembra/env` 파일 폴백 경로
+    - skills/config/SKILL.md 의 인터랙티브 키 입력 플로우
+    - 대화창 붙여넣기 설정 경로
+    - 하이브리드 lookup chain (step 1/2/3)
+  - **유일한 경로**: `/plugin → ensembra → Enter → Configure options` → dialog → Save → `/reload-plugins`
+  - **스킬/에이전트 참조**: `${user_config.gemini_api_key}` 템플릿 치환
+  - **훅 subprocess 참조**: `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY`
+  - **Gate3 검증 필요**: `${user_config.gemini_api_key}` 템플릿 치환이 실제로 skills/agents 본문에서 작동하는지 empirical test 필요. Claude Code 문서에선 작동한다고 명시되어 있지만 실제 확인 전까지 이 가정에 의존
+  - **리스크**: 만약 템플릿 치환이 작동하지 않으면 skills 에서 Gemini 키에 접근할 방법이 없어져서 architect Performer 가 항상 Claude 폴백. 이 경우 v0.5.1 에서 환경변수 스코프 수정 (예: 스킬에 별도 메커니즘 추가) 필요
+  - **근거**: 사용자 요구 — "최초의 운영체제 키설정으로 회귀". 설계 단순성과 보안 극대화가 미검증 워크어라운드보다 낫다는 판단
+  - **기존 사용자 마이그레이션**:
+    1. `rm -rf ~/.config/ensembra`
+    2. `claude plugin update ensembra@ensembra`
+    3. `/plugin → ensembra → Configure options` 에서 키 재설정
+    4. `/reload-plugins`
+  - **심사 영향**: v0.1.0 마켓플레이스 심사와 무관 (제출 시점 커밋 고정). v0.5.0 은 main 에 merge 후 태그 발행, 승인 결과 반영
+
 - **2026-04-16 — Claude Code 2.1.109 userConfig 실제 규격 확인 (바이너리 리버싱)**
   - 우리가 v0.2.x → v0.3.0 → v0.4.0 에 걸쳐 "Claude Code 버그" 로 단정한 userConfig sensitive 필드 처리를, Claude Code 바이너리 (`~/.local/share/claude/versions/2.1.109`, Mach-O arm64 201MB) 의 strings 로 리버싱해 실제 규격을 확인
   - **발견 1 — sensitive 필드는 실제로 구현되어 있다**:

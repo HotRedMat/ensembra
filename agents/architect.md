@@ -11,13 +11,12 @@ tools: Read, Grep, Glob
 
 ## 기본 Transport
 - 기본: `gemini` / `gemini-2.5-flash` (공식 무료 API)
-- **API 키 하이브리드 조회 체인** (v0.3.0+):
-  1. `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` 환경변수 — Claude Code `userConfig` 에서 주입 (미래 Claude Code 버전에서 제대로 작동 시)
-  2. `~/.config/ensembra/env` 파일의 `GEMINI_API_KEY=...` — Claude Code 2.x userConfig 버그 워크어라운드 (`chmod 600` 강제)
-  3. 둘 다 없음 → 즉시 Claude 서브에이전트로 폴백
-- 폴백: Claude 본체 세션 모델 (`sonnet` 등)
-- 폴백 발생 시 Conductor 가 배지로 고지
-- **현재 권장 경로**: v0.3.0 기준 Claude Code 2.1.109 의 plugin install 이 sensitive userConfig 프롬프트를 띄우지 못하므로, `/ensembra:config → 5) Transports → c) Gemini API key` 에서 인터랙티브 설정 플로우를 사용하는 것이 가장 안전
+- **API 키 저장**: Claude Code 플러그인 `userConfig.gemini_api_key` + `sensitive: true`
+  - OS 키체인에 저장 (macOS Keychain / Linux Secret Service / `.credentials.json`)
+  - 디스크 평문 저장 없음
+- **참조**: `${user_config.gemini_api_key}` 템플릿 치환 (skills, MCP/LSP configs, hook commands) 또는 hook subprocess 의 `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY`
+- **설정 경로**: `/plugin → ensembra → Enter → "Configure options"` 서브메뉴 → dialog 에 키 입력 (sensitive 이므로 입력 masking)
+- **키 없음 → Claude 서브에이전트 폴백** (architect 는 `sonnet` 등으로 동작, 파이프라인 완전 작동)
 
 ## 책임
 1. Phase 0 Context Snapshot 의 **디렉토리 구조·호출 그래프·데이터 흐름**을 바탕으로 현재 아키텍처 파악

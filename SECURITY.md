@@ -2,40 +2,53 @@
 
 ## 시크릿 취급 정책 (Q5, Q7 결정 반영)
 
-Ensembra 의 유일한 시크릿은 Gemini API 키다. **하이브리드 저장 정책** (v0.3.0+):
+Ensembra 의 유일한 시크릿은 Gemini API 키다. **순수 Claude Code userConfig + OS 키체인 단일 경로** (v0.5.0+).
 
-## Gemini API 키 저장 (v0.3.0+ 하이브리드)
+## Gemini API 키 저장 (v0.5.0+)
 
-**조회 체인** (우선순위):
+**저장 메커니즘**: Claude Code 플러그인 `userConfig.gemini_api_key` (`type: "string"`, `sensitive: true`)
 
-1. **`$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` 환경변수** (이상적 경로)
-   - Claude Code 플러그인 `userConfig.gemini_api_key` + `sensitive: true` 에서 주입
-   - 저장 위치: OS 키체인
-     - macOS Keychain
-     - Windows Credential Manager
-     - Linux Secret Service (gnome-keyring/kwallet) — 불가 시 `~/.claude/.credentials.json`
-   - 암호화: OS 레벨
-   - **현 상태 (Claude Code 2.1.109)**: plugin install 이 sensitive 프롬프트를 띄우지 못하는 버그. 미래 버전에서 해결되면 자동 우선 작동.
+**실제 저장 위치** (Claude Code 가 자동 선택):
+- **macOS**: Keychain
+- **Windows**: Credential Manager
+- **Linux**: Secret Service (gnome-keyring / kwallet) 또는 `~/.claude/.credentials.json`
 
-2. **`~/.config/ensembra/env` 파일** (현재 권장 경로, v0.3.0 워크어라운드)
-   - 포맷: `GEMINI_API_KEY=AIza...`
-   - 권한: **`chmod 600` 강제** (사용자만 읽기 가능)
-   - 생성 방법 2가지:
-     - **Claude Code 내부**: `/ensembra:config → 5) Transports → c) Gemini API key` 인터랙티브 플로우 — 스킬이 직접 Write 툴로 파일 생성
-     - **터미널 직접**: `mkdir -p ~/.config/ensembra && echo 'GEMINI_API_KEY=AIza...' > ~/.config/ensembra/env && chmod 600 ~/.config/ensembra/env`
-   - 보호 수준: 파일시스템 권한 (OS 키체인보다 약하지만 평문 환경변수보다 강함)
-   - 리스크:
-     - 백업·동기화 시스템이 `~/.config/` 를 백업할 경우 노출
-     - `cat` 으로 사용자가 실수로 공유 가능
-     - 완화: 경로가 `~/.config/ensembra/` 라는 네이티브 Linux/macOS 표준 위치라 일반적 백업 도구 (Time Machine 등) 는 제외 권장 대상이 아님
+**암호화**: OS 레벨 (디스크 암호화 + 프로세스 ACL + 키체인 unlock)
 
-3. **둘 다 없음** — architect Performer 는 Claude 서브에이전트로 자동 폴백. Ensembra 는 완전히 작동 (단지 Gemini 를 안 쓸 뿐).
+**설정 방법** (단일 경로):
+1. Claude Code 에서 `/plugin` 실행
+2. ↓ 로 `ensembra` 선택
+3. Enter (상세 화면 진입)
+4. "Configure options" 서브메뉴 선택 → Enter
+5. dialog 에 `gemini_api_key` 입력 (sensitive 이므로 입력이 화면에 표시 안 됨)
+6. Save
+7. `/reload-plugins`
 
-## 왜 하이브리드가 필요한가
+**참조 방법** (스킬·에이전트·훅):
+- `${user_config.gemini_api_key}` 템플릿 치환 (스킬·에이전트·MCP/LSP configs·훅 commands)
+- 훅 subprocess 에서는 `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` 환경변수도 접근 가능
 
-v0.2.0 에서 순수 `userConfig` 경로로 전환했지만, Claude Code 2.1.109 의 plugin install 과 `/plugin` UI 모두 sensitive userConfig 필드의 입력·저장을 제대로 처리하지 못하는 **런타임 버그** 가 확인됨. 이 버그가 해결되기 전까지 Ensembra 사용자는 Gemini 설정을 할 수 없음.
+**키 없음 처리**: architect Performer 는 Claude 서브에이전트로 자동 폴백. Ensembra 는 Gemini 없이도 완전히 작동.
 
-v0.3.0 은 Claude Code 가 고쳐지는 미래와 현재를 **동시에 지원** 한다. userConfig 선언은 유지하므로 고쳐진 버전에선 자동으로 최상위 경로가 작동한다.
+## 제거된 경로 (v0.5.0)
+
+다음 경로들은 v0.3.x~v0.4.x 에서 Claude Code 오해에 기반한 워크어라운드였음. 바이너리 리버싱으로 Claude Code 의 실제 규격을 확인 후 v0.5.0 에서 모두 제거:
+- ❌ `~/.config/ensembra/env` 파일 폴백
+- ❌ `bin/ensembra-set-key` 스크립트
+- ❌ `/ensembra:config` 인터랙티브 키 입력 플로우
+- ❌ 대화창 키 붙여넣기 경로
+
+## 왜 순수 userConfig 가 정답인가
+
+Claude Code 2.1.109 바이너리 리버싱 결과:
+
+1. `sensitive: true` 필드는 **완전 구현** 되어 있음
+   - 바이너리 문자열: `"If true, masks dialog input and stores value in secure storage (keychain/credentials file) instead of settings.json"`
+2. `/plugin` UI 의 `"Configure options"` 서브메뉴가 sensitive 프롬프트를 제공
+   - 조건: `if (plugin.manifest.userConfig && Object.keys(...).length > 0)`
+3. `${user_config.KEY}` 템플릿 치환이 스킬·에이전트·hook/MCP/LSP 본문에서 정상 작동하도록 설계됨
+
+즉 **Claude Code 에 버그가 없었고**, 우리는 다만 `/plugin → ensembra → Configure options` UI 경로를 찾지 못하고 "버그" 로 오인했을 뿐. 올바른 경로만 쓰면 OS 키체인이 완벽하게 작동한다.
 
 ## 대안 Performer 는 시크릿 불필요
 

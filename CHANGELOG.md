@@ -7,6 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-04-16
+
+### Changed — purified back to OS keychain single path
+
+Reverted the hybrid secret storage scheme introduced in v0.3.0–v0.4.x. After reverse-engineering Claude Code 2.1.109 we confirmed the native `userConfig` + `sensitive: true` path is fully implemented and the correct UI route is `/plugin → ensembra → Enter → Configure options`. v0.5.0 trusts that path exclusively and removes every workaround layer.
+
+### Removed
+
+- `bin/ensembra-set-key` shell script (was: v0.4.0–v0.4.1 script for `/dev/tty`-based key entry)
+- `bin/` directory entirely (no more plugin-shipped binaries)
+- `~/.config/ensembra/env` file fallback (existed as step 2 of the v0.3.0 hybrid lookup chain)
+- In-session chat-paste key setup flow in `skills/config/SKILL.md` (5)c
+- Every reference to `${CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY}` env var as a skill-side source of truth — hooks still use it, but skills now rely on `${user_config.gemini_api_key}` template substitution
+
+### Single remaining path
+
+1. User runs `/plugin` in Claude Code
+2. Navigates to `ensembra → Configure options`
+3. Enters the Gemini key in the masked dialog
+4. Claude Code saves it to the OS keychain
+5. Skills and agents reference it via `${user_config.gemini_api_key}` template substitution
+6. Hooks can also access it via `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY`
+
+### Documentation
+
+- `README.md`: setup section reduced to the single native-UI path
+- `examples/quickstart.md`: same
+- `CONTRACT.md` §8.4: rewritten for pure-userConfig policy; lists previous versions for historical context
+- `SECURITY.md`: rewritten; all workaround paths removed from the threat model; keychain described as the only storage
+- `CONTRIBUTING.md`: contributor setup uses the native UI path
+- `skills/config/SKILL.md` (5)c: now just displays state and instructs the user to use the native UI
+- `agents/architect.md`, `skills/run/SKILL.md`: curl now references `${user_config.gemini_api_key}` directly
+
+### Migration from v0.1.x through v0.4.x
+
+If you previously had `~/.config/ensembra/env`:
+
+```bash
+# 1. Delete the old file (no longer used)
+rm -rf ~/.config/ensembra
+
+# 2. Update the plugin
+claude plugin marketplace update ensembra
+claude plugin update ensembra@ensembra
+
+# 3. Set the key through the native UI
+# Inside Claude Code:
+#   /plugin → ↓ to ensembra → Enter → Configure options
+#   enter gemini_api_key → Save
+#   /reload-plugins
+```
+
+If you never set up a key: no action needed. Ensembra works without one (architect falls back to a Claude sub-agent).
+
+### Why revert
+
+After weeks of workarounds, a binary strings extraction of `~/.local/share/claude/versions/2.1.109` (Mach-O arm64, 201 MB) confirmed:
+
+- `sensitive: true` is fully implemented per the Zod schema: `"If true, masks dialog input and stores value in secure storage (keychain/credentials file) instead of settings.json"`
+- The `/plugin` UI exposes a `"Configure options"` submenu whenever `userConfig` has entries: `if (plugin.manifest.userConfig && Object.keys(...).length > 0) menu.push({label: "Configure options", ...})`
+- `${user_config.KEY}` template substitution is documented as working in "MCP/LSP server config, hook commands, and skill/agent content"
+
+Our earlier conclusion "Claude Code has a bug" was wrong. Our UI tests never reached the `Configure options` submenu, and the `$CLAUDE_PLUGIN_OPTION_KEY` env var we were polling from skills is explicitly scoped to hooks — not a bug, just a scope we misunderstood. v0.5.0 is the honest correction.
+
 ### Investigated (2026-04-16)
 
 - **Reverse-engineered Claude Code 2.1.109's `userConfig` handling** to determine whether the Gemini key setup bug is a Claude Code defect or a misunderstanding on our side. Extracted strings from the binary (`~/.local/share/claude/versions/2.1.109`, Mach-O arm64, 201 MB) and found:
@@ -230,7 +294,8 @@ If you never set up an env file, no action needed — just `claude plugin update
 - Ensembra itself needs installation on a real project to test the full pipeline
 - Ollama and Gemini API key setup must be done manually before first use
 
-[Unreleased]: https://github.com/HotRedMat/ensembra/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/HotRedMat/ensembra/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/HotRedMat/ensembra/releases/tag/v0.5.0
 [0.4.1]: https://github.com/HotRedMat/ensembra/releases/tag/v0.4.1
 [0.4.0]: https://github.com/HotRedMat/ensembra/releases/tag/v0.4.0
 [0.3.0]: https://github.com/HotRedMat/ensembra/releases/tag/v0.3.0

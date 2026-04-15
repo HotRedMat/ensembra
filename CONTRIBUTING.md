@@ -30,7 +30,7 @@ claude --plugin-dir /path/to/ensembra
 ### Optional transport setup
 
 - **Ollama**: `ollama pull qwen2.5:14b llama3.1:8b`
-- **Gemini**: get a free key at `https://aistudio.google.com/app/apikey`. Set it up via the in-session flow `/ensembra:config → 5) Transports → c) Gemini API key`, or via terminal: `read -s -p "Gemini API key: " K && mkdir -p ~/.config/ensembra && echo "GEMINI_API_KEY=$K" > ~/.config/ensembra/env && chmod 600 ~/.config/ensembra/env && unset K`. v0.3.0 uses a hybrid lookup chain (userConfig env var → env file fallback) to work around the Claude Code 2.x sensitive-userConfig bug.
+- **Gemini**: get a free key at `https://aistudio.google.com/app/apikey`. Set it via Claude Code's native plugin UI: `/plugin → ↓ to ensembra → Enter → Configure options → enter key (hidden) → Save → /reload-plugins`. The key is stored in the OS keychain (macOS Keychain or `~/.claude/.credentials.json`), never in a plaintext file. v0.5.0 removed all workaround paths (env file, bin script, chat paste).
 
 ## Making changes
 
