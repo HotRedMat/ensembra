@@ -255,6 +255,14 @@ ensembra/
   - 메인 메뉴 8개 + 서브메뉴, 상세 `CONTRACT.md` §14
   - **근거**: Claude Code `/config` 와 동일한 UX 일관성. 1인 개발자가 플래그·JSON 문법을 외울 필요 없음. 모든 런타임 결정을 한 곳에 집중.
 
+- **2026-04-16 — v0.2.1 긴급 패치 (userConfig 스키마)**
+  - v0.2.0 릴리스 직후 로컬 설치 시도에서 `Failed to install plugin "ensembra": invalid manifest file` 에러 발생
+  - 원인: Gate1 STEP 0 에서 참조한 공식 문서 예시가 `userConfig` 엔트리의 **간략형** 만 제시 (`description` + `sensitive`). 실제 validator 는 `type` (enum: string/number/boolean/directory/file) 과 `title` (string) 을 **추가 필수** 로 요구
+  - 수정: plugin.json 의 `gemini_api_key`, `ollama_endpoint` 엔트리에 `type: "string"` + `title` 추가
+  - 버전 범프: 0.2.0 → 0.2.1 (patch)
+  - v0.2.0 릴리스는 삭제하지 않고 "BROKEN" 로 마킹 — 투명한 릴리스 이력 유지
+  - **교훈**: 공식 문서 예시에 의존하지 말고 **실제 설치 테스트** 를 CI 에 포함해야 함. Gate3 이월: `.github/workflows/plugin-validate.yml` 에 `claude plugin install` smoke 단계 추가 검토
+
 - **2026-04-16 — v0.2.0 Gemini 키 저장 정책 전환 (Q7 재결정)**
   - v0.1.x 의 `~/.config/ensembra/env` 평문 파일 방식 → **Claude Code userConfig + OS 키체인** 전환
   - `plugin.json` 에 `userConfig.gemini_api_key` (`sensitive: true`) + `userConfig.ollama_endpoint` (비시크릿) 선언
