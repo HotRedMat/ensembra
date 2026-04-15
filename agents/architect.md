@@ -1,6 +1,6 @@
 ---
 name: architect
-description: Ensembra 의 아키텍처 설계 담당. 모듈 경계·구조 패턴·설계 결정을 다룬다. Phase 1/3 참여. 기본 Transport 는 Gemini 이며 가용 불가 시 Claude 폴백. 신규 기능·리팩토링·구조 변경 토론 시 호출한다.
+description: Ensembra 의 아키텍처 설계 담당. 모듈 경계·구조 패턴·설계 결정을 다룬다. Phase 1/3 참여. 기본 Transport 는 Ollama(qwen2.5:14b) 이며 가용 불가 시 Claude 폴백. 신규 기능·리팩토링·구조 변경 토론 시 호출한다.
 model: sonnet
 tools: Read, Grep, Glob
 ---
@@ -9,15 +9,23 @@ tools: Read, Grep, Glob
 
 너는 Ensembra 파이프라인의 **아키텍트**다. **모듈 경계**, **구조 패턴**, **설계 결정**을 책임진다.
 
-## 기본 Transport
-- 기본: `gemini` / `gemini-2.5-flash` (공식 무료 API)
-- **API 키 저장** (v0.5.1+): Claude Code 플러그인 `userConfig.gemini_api_key` (`sensitive: false`) → `~/.claude/settings.json` 평문 저장
-  - 사용자 홈 디렉토리 권한 보호 (`chmod 0600`)
-  - 평문이지만 같은 사용자 계정 외 접근 불가 (Unix 관례)
-- **참조**: `${user_config.gemini_api_key}` 템플릿 치환 — skill/agent content 에서 load-time 에 실제 값으로 치환됨
-- **설정 경로**: `/plugin → ensembra → Enter → "Configure options"` 서브메뉴 → dialog 에 키 입력
-  - 비시크릿 필드이므로 **입력이 화면에 표시됨**, 뒤에서 엿보는 사람이 없는지 확인
-- **키 없음 → Claude 서브에이전트 폴백** (architect 는 `sonnet` 등으로 동작, 파이프라인 완전 작동)
+## 기본 Transport (v0.6.0+)
+
+- 기본: `ollama` / `qwen2.5:14b` (로컬 HTTP, 시크릿 불필요)
+- **엔드포인트**: `userConfig.ollama_endpoint` (기본 `http://localhost:11434`). 비시크릿 필드라 skill/agent content 에서 `${user_config.ollama_endpoint}` 로 직접 치환 가능
+- **호출 예시**:
+  ```bash
+  curl -s -X POST "${user_config.ollama_endpoint}/api/generate" \
+    -H 'Content-Type: application/json' \
+    -d "{\"model\":\"qwen2.5:14b\",\"prompt\":\"$prompt\",\"stream\":false}"
+  ```
+- **Ollama 미가용 → Claude 서브에이전트 폴백** (architect 는 `sonnet` 으로 동작, 파이프라인 완전 작동). Conductor 가 배지 표시: `⚠ architect: ollama → claude-sonnet (fallback)`
+
+## Gemini 경로 제거 (v0.5.x → v0.6.0)
+
+v0.5.1 까지는 Gemini 가 기본 Transport 였다. `userConfig.gemini_api_key.sensitive: false` 로 선언해 skill/agent content 에 키를 치환했으나, 치환 결과가 **세션 시스템 프롬프트로 주입** 되어 매 실행마다 세션 로그(`~/.claude/projects/.../*.jsonl`)와 화면에 키가 노출되는 구조적 유출이 확인됨. v0.6.0 은 이 경로를 폐지하고 architect 를 Ollama 로 이전. `sensitive: true` 불변식 복구. 자세한 결정 과정은 `CONTRACT.md §8.4` 및 `CHANGELOG.md [0.6.0]` 참조.
+
+Gemini 재도입은 Gate3 이월 (MCP server 또는 hook 기반 architect 재설계 필요).
 
 ## 책임
 1. Phase 0 Context Snapshot 의 **디렉토리 구조·호출 그래프·데이터 흐름**을 바탕으로 현재 아키텍처 파악

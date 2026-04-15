@@ -62,7 +62,7 @@ Phase 4 Document   — scribe records Task / Design / Request / Daily / Weekly
 | Role | Responsibility | Default Transport | Default Model |
 |---|---|---|---|
 | 🧭 **planner** | Requirements, acceptance criteria | Claude sub-agent | `opus` |
-| 🏛 **architect** | Module boundaries, patterns | Gemini | `gemini-2.5-flash` |
+| 🏛 **architect** | Module boundaries, patterns | Ollama | `qwen2.5:14b` |
 | 🛠 **developer** | Implementation strategy | Claude sub-agent | `sonnet` |
 | 🛡 **security** | Threats, secrets, OWASP | Ollama | `qwen2.5:14b` |
 | 🧪 **qa** | Edge cases, regression | Ollama | `llama3.1:8b` |
@@ -111,39 +111,21 @@ claude plugin install ensembra@ensembra
 ollama pull qwen2.5:14b llama3.1:8b
 ```
 
-### Gemini setup (optional, for architect)
+### Ollama setup for architect (v0.6.0+)
 
-Ensembra v0.5.1 stores the Gemini key under `~/.claude/settings.json` (plaintext in the user's home directory, same convention as AWS CLI, gcloud, git credentials, and netrc). This is a deliberate trade-off: Claude Code blocks `sensitive: true` values from being substituted into skill/agent content, so Ensembra's architect Performer cannot reach a keychain-stored value when dispatching a Gemini call from a skill.
+The architect Performer uses Ollama (`qwen2.5:14b`) by default as of v0.6.0. Pull the model:
 
-The storage path is `~/.claude/settings.json` → `pluginConfigs.ensembra@ensembra.options.gemini_api_key`. File permission is 0600 (user only). Skills and agents access it via `${user_config.gemini_api_key}` template substitution.
-
-Set the key via the Claude Code plugin UI:
-
-```
-/plugin
+```bash
+ollama pull qwen2.5:14b
 ```
 
-Then:
-1. Move the cursor down to `ensembra`
-2. Press **Enter** to open the plugin detail view
-3. Select **"Configure options"**
-4. Enter the key in the `gemini_api_key` field. Input is **visible** (no masking) because the field is declared `sensitive: false`. Make sure nobody is looking over your shoulder.
-5. Save
-6. `/reload-plugins`
+If Ollama is not running (or the model is missing), architect falls back to a Claude sub-agent automatically — Ensembra works fully without Ollama.
 
-**Get a free API key** at <https://aistudio.google.com/app/apikey>. Default model is `gemini-2.5-flash`.
+### Gemini (removed in v0.6.0)
 
-**Leave it unset if you don't want Gemini** — the architect performer falls back to a Claude sub-agent automatically. Ensembra works fully without a key.
+v0.5.x shipped Gemini as the default architect Transport via a `sensitive: false` userConfig field that substituted the API key into skill content. Testing showed this substitution flows into the session system prompt and thus into `~/.claude/projects/**.jsonl` on every pipeline invocation — a structural key leak that two manual rotations failed to contain. **v0.6.0 removes the Gemini path entirely** and restores the `sensitive: true` invariant.
 
-**Security notes**:
-- The key is stored plaintext in `~/.claude/settings.json`, readable only by your user account (`chmod 0600`)
-- Do not share `~/.claude/settings.json` with anyone — rotate the key at https://aistudio.google.com/app/apikey if you do
-- Gemini free-tier keys have no billing impact and can be rotated instantly
-- For an explanation of why Ensembra uses `sensitive: false` instead of `sensitive: true`, see [`SECURITY.md`](./SECURITY.md)
-
-**Get a free API key** at <https://aistudio.google.com/app/apikey>. Default model is `gemini-2.5-flash`.
-
-**Leave it unset if you don't want Gemini** — the architect performer will fall back to a Claude sub-agent automatically. No Gemini account required to use Ensembra.
+The `gemini_api_key` field remains declared in `plugin.json` but is **unused by the current pipeline**. It is reserved for a future Gate3 re-integration in which architect would be re-implemented as an MCP server or hook command — the only contexts where sensitive userConfig values are safely accessible. See [`SECURITY.md`](./SECURITY.md) and `CHANGELOG.md [0.6.0]` for the full postmortem.
 
 ## Reuse-First Policy
 

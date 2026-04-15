@@ -7,7 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added — Plan Tier Overlay
+## [0.6.0] — 2026-04-16
+
+### Security (critical — closes structural Gemini key leak)
+
+- **Gemini 경로 폐지 + `sensitive: true` 불변식 복구**. v0.5.1 은 `userConfig.gemini_api_key.sensitive: false` 로 선언해 `${user_config.gemini_api_key}` 치환이 skill/agent content 에서 작동하도록 했으나, 이 치환이 **스킬 호출 시 시스템 프롬프트로 주입** 되어 매 `/ensembra:run` 실행마다 세션 로그(`~/.claude/projects/.../*.jsonl`)와 화면 트랜스크립트에 키가 평문으로 재기록되는 구조적 유출이 실측 확인됨.
+  - 실측: 2026-04-16 세션에서 두 번의 키 로테이션에도 불구하고 각 `/ensembra:run` 호출이 새 키를 즉시 재유출하는 것을 확인
+  - 근본 원인: skill/agent content 에 sensitive 값을 치환하는 설계는 "스킬 본문 = 시스템 프롬프트" 라는 Claude Code 불변식과 충돌. sensitive 값은 하류 로깅 시스템 전체에 전파되어야만 스킬에서 사용 가능
+- **Architect Performer 를 Ollama(`qwen2.5:14b`) 로 이전**. 로컬 HTTP 는 시크릿 불필요하므로 구조적으로 안전. Ollama 가용 실패 시 Claude 서브에이전트(`sonnet`)로 폴백
+
+### Changed
+
+- `.claude-plugin/plugin.json`:
+  - `version`: 0.5.1 → 0.6.0
+  - `userConfig.gemini_api_key.sensitive`: `false` → `true`
+  - `title`, `description` 재작성 — "architect uses Ollama by default; Gemini field reserved for future MCP integration"
+- `agents/architect.md`: 기본 Transport 를 `gemini` → `ollama` / `qwen2.5:14b`. Transport 섹션 재작성. Gemini 폐지 배경 설명 추가
+- `skills/run/SKILL.md`: "Transport 호출 규약 (architect = Gemini 경우)" 섹션을 "Transport 호출 규약 (architect = Ollama, v0.6.0+)" 로 완전 대체. `${user_config.gemini_api_key}` 참조 제거
+- `CONTRACT.md §8.4`: 제목 "Gemini 키 취급 (v0.5.1+ `sensitive: false` — 의식적 타협)" → "Architect Transport 및 Gemini 폐지 (v0.6.0+)" 로 교체. v0.5.1 타협의 실패 배경 + Ollama 이관 + Gate3 이월 조건 기록
+- `SECURITY.md`: Gemini 섹션 전면 재작성. "Ensembra 파이프라인은 시크릿을 요구하지 않는다" 를 최상위 원칙으로 승격. v0.5.1 구조적 유출을 근거로 `sensitive: true` 복구 정당화
+
+### Removed
+
+- skill/agent content 내 `${user_config.gemini_api_key}` 치환 참조 전부
+- architect 의 Gemini 기본 Transport
+- Gemini curl 예시 전부 (CONTRACT/SECURITY/INTERVIEW/README/SKILL.md)
+
+### Migration
+
+사용자는 별도 조치 불필요. 기존 설정된 `gemini_api_key` 값은 OS 키체인에 남되 파이프라인이 참조하지 않는다. 원하면 `/plugin → ensembra → Configure options` 에서 값을 지워도 됨. Ollama 가 localhost 에 없으면 architect 는 Claude 서브에이전트로 자동 폴백하므로 행동 변화 없음.
+
+### Gate3 이월
+
+Gemini 재도입은 architect Performer 를 MCP server 또는 hook command 로 이전한 뒤에만 가능. 선행 조건:
+1. architect 를 MCP server 로 구현 (stdio 프로토콜 + manifest)
+2. MCP server config 에서 sensitive 치환 사용 (`${user_config.gemini_api_key}`)
+3. skill/agent content 는 architect 호출 결과만 참조
+
+### Added (Plan Tier Overlay — prior commit 1c19cc3)
 
 - **`plan_tier` 설정 신설** — Claude 플랜(Pro/Max) 별로 파이프라인 실행 강도를 조절하는 오버레이. preset 자체는 건드리지 않고 위에 겹쳐 적용된다.
   - `pro` (기본): Deep Scan 선택 4항목 off + 강제 6항목 중 3·4·10 압축, Context Snapshot 심볼 목록만, R2 합의율 ≥85% 면 스킵·아니면 diff 요약 전달, Audit 감사자 첫 1명, scribe 입력 요약본. feature 1회 실행 기준 **예상 토큰 ~30%**
@@ -16,17 +53,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Auto-Escalation**: pro 실행 중 R1 합의율 40~70% 구간 진입 시 Conductor 가 1회 한정 max R2 승격을 사용자에게 제안
 - **금지선** (tier 로 토글 불가): `feature` preset 의 `security`/`qa` Performer 참여, `rounds.*_consensus` 임계값, `reuse_first.device_*` 토글, Deep Scan 강제 6항목의 "미수행" (압축·범위 축소는 허용)
 - `/ensembra:config` 메인 메뉴에 **10) Plan Tier** 추가. 기존 "Reset" 은 11번으로 이동
-
-### Changed
-
 - `schemas/config.json`: `plan_tier` 속성 추가 (enum `pro`/`max`, 기본값 `pro`)
-- `skills/run/SKILL.md`: 인자 파싱에 `--tier=` 옵션 추가, **Plan Tier Resolution** 섹션 신설, Phase 0/1/3/4 본문에 tier 훅 삽입, 출력 포맷에 `🎚 plan_tier` 배지 추가
-- `skills/config/SKILL.md`: 메인 메뉴 항목 재번호(Reset 10→11), Plan Tier 서브메뉴 신설
+- `skills/run/SKILL.md`: 인자 파싱에 `--tier=` 옵션, **Plan Tier Resolution** 섹션, Phase 0/1/3/4 본문 tier 훅, 출력 포맷 `🎚 plan_tier` 배지
+- `skills/config/SKILL.md`: 메인 메뉴 재번호(Reset 10→11), Plan Tier 서브메뉴 신설
 - `CONTRACT.md`: §17 "Plan Tier Profiles" 신설. 기존 §17 "Gate2 이월 항목" 은 §18 로 이동
-- `.github/PULL_REQUEST_TEMPLATE.md`: `§1–§17` → `§1–§18`
-- `.github/ISSUE_TEMPLATE/feature_request.yml`: Gate2 참조를 §18 로 갱신
+- `.github/PULL_REQUEST_TEMPLATE.md`, `.github/ISSUE_TEMPLATE/feature_request.yml`: Gate2 참조 §18 로 갱신
 
-### Design rationale
+### Design rationale (Plan Tier)
 
 Claude Pro 5시간 롤링 윈도우에서는 토큰 총량보다 **메시지 호출 횟수·컨텍스트 크기**가 실질 병목이다. Performer 수·라운드 수는 preset 정체성이므로 건드리지 않고, **Performer 에 전달되는 입력 크기**와 **R2·Audit 호출 횟수** 를 줄이는 축으로 절감한다. 품질에 가장 민감한 `security`/`qa` 참여와 합의율 임계값은 금지선으로 보호해 "절약 때문에 결론이 뒤집히는" 사고를 구조적으로 차단.
 

@@ -60,15 +60,17 @@ Performer 호출 방식은 3종 혼용으로 확정:
 - [x] Deep Scan 체크리스트 중 1~4번은 강제 on (얕은 읽기 방지)
 
 ## Q7. Gemini 키 관리
-- **v0.1.x (deprecated)**: `~/.config/ensembra/env` 평문 파일 + `chmod 600`
-- **v0.2.0+ (current)**: Claude Code 플러그인 `userConfig.gemini_api_key` + `sensitive: true` → OS 키체인
-  - [x] 저장 위치: macOS Keychain / Windows Credential Manager / Linux Secret Service
-  - [x] 입력 시점: `claude plugin install / enable ensembra` 설치 프롬프트
-  - [x] 참조: `${user_config.gemini_api_key}` 또는 `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY`
-  - [x] 로그 마스킹: 8가지 패턴 전부 `[REDACTED]` (SECURITY.md 참조)
-  - [x] 빈 값 허용: 없으면 architect → Claude 서브에이전트 자동 폴백
-  - [x] 재입력: `claude plugin disable && claude plugin enable`
-- **근거**: 평문 파일보다 OS 레벨 암호화가 질적으로 더 안전. 사용자 UX 도 단순해짐 (설치 시 한 번 프롬프트만). 마켓플레이스 심사에 유리.
+- **v0.1.x**: `~/.config/ensembra/env` 평문 파일 + `chmod 600` (폐지)
+- **v0.2.0~v0.4.x**: `userConfig.gemini_api_key` + `sensitive: true` → OS 키체인 (v0.5.0 에서 실전 실패)
+- **v0.5.0**: `sensitive: true` + 바이너리 리버싱으로 `[sensitive option 'gemini_api_key' not available in skill content]` placeholder 차단 확인 — architect 호출 경로 작동 불가
+- **v0.5.1**: `sensitive: false` 로 타협, skill content 치환 작동하지만 **시스템 프롬프트로 주입 → 세션 로그 자동 기록** 의 residual risk 수락
+- **v0.6.0 (current)**: Gemini 경로 전면 폐지. architect 를 **Ollama(`qwen2.5:14b`)** 로 이전. `sensitive: true` 불변식 복구. `gemini_api_key` 필드는 선언만 유지 (Gate3 MCP 재도입용 예약)
+  - [x] **실측 근거**: 2026-04-16 세션에서 두 번의 수동 키 로테이션에도 불구하고 각 `/ensembra:run` 호출이 새 키를 즉시 `~/.claude/projects/.../*.jsonl` 에 재기록하는 것을 확인. v0.5.1 의 residual risk 는 실측상 "매 호출마다 필연"
+  - [x] architect 기본 Transport: `ollama` / `qwen2.5:14b`. `${user_config.ollama_endpoint}` 는 비시크릿이므로 치환 가능·유출 무관
+  - [x] 폴백: Ollama 가용 실패 시 Claude 서브에이전트(`sonnet`)
+  - [x] 로그 마스킹 패턴은 유지 (잔여 위험 방어 — 사용자가 외부 용도로 키를 쓸 수 있음)
+  - [x] Gemini 재도입 전제 (Gate3): architect 를 MCP server/hook 으로 이전해 sensitive 치환 컨텍스트에서만 키 접근
+- **근거**: 스킬 본문에 sensitive 값을 치환하는 설계는 "스킬 본문 = 시스템 프롬프트 = 로그 기록 대상" 이라는 Claude Code 불변식과 충돌한다. v0.5.1 의 트레이드오프는 "편의성을 위해 구조적 유출 수락" 이었으며, 실측 후 **"편의성을 포기하고 구조적 안전성을 선택"** 으로 재결정. Ollama 는 로컬이라 본질적으로 시크릿 불필요 → 동일 보안 속성을 **의존성 없이** 달성.
 
 ---
 
@@ -417,3 +419,16 @@ ensembra/
     - 프리셋별 차등 가능
   - **근거 총괄**: 1인 개발자 UX, 유지보수 우선(재사용), 얕은 읽기 방지(Deep Scan 강제), 실행/토론 분리(Claude Code=실행, 외부 LLM=토론), 문서 자동화로 미래의 나 지원.
   - **모든 결정은 `/ensembra:config` 에서 런타임 조정 가능** — Gate1 은 기본값 확정. 운영 중 피드백 기반으로 Gate2 이후 보완.
+
+- **2026-04-16 — v0.6.0 Gemini 경로 구조적 폐지 + architect → Ollama 이관 (Q7 재재결정)**
+  - **사건**: v0.5.1 이 `sensitive: false` 로 타협한 직후, 실전 세션에서 구 키 발견 → 로테이션 → 새 키 `/ensembra:run` 1회 호출 → 새 키 즉시 재유출 확인 (세션 jsonl + file-history 스냅샷). 두 번째 로테이션도 같은 결과. v0.5.1 SECURITY.md 의 residual risk 가 실측상 "매 호출마다 필연"
+  - **근본 원인**: skill content 에 sensitive 값을 치환하는 설계 = "스킬 본문 → 시스템 프롬프트 → 세션 로그" 경로로 자동 전파. Claude Code 의 sensitive 차단 규칙이 왜 존재하는지 실증
+  - **결정**: Gemini 경로 전체 폐지, architect 기본 Transport 를 `gemini`/`gemini-2.5-flash` → `ollama`/`qwen2.5:14b` 로 이전. `sensitive: true` 불변식 복구. `gemini_api_key` 필드는 선언만 유지하고 파이프라인은 접근 금지
+  - **대안 기각**:
+    - A (architect 를 hook command 로 이전): Performer 의미론(토론 참여자)과 hook 패러다임 충돌, 어댑터 층 필요
+    - B (architect 를 MCP server 로 이전): 구조적으로 가장 깔끔하나 신규 stdio 프로세스 + manifest 필요 → v0.6.0 범위 초과, Gate3 이월
+    - C (현행 유지): 각 실행마다 키 재유출 지속, 수락 불가
+    - **D (채택)**: Ollama 이관 + Gemini 폐지. 최소 침습 + 구조적 안전 + 외부 모델 앙상블 유지(Ollama 로컬 3종)
+  - **트레이드오프**: Gemini 클라우드 호출(무료 15 RPM) 포기. 대신 로컬 Ollama 는 rate limit·시크릿 없음. 사용자가 Gemini 를 꼭 쓰고 싶으면 Ensembra 외부에서 직접 curl 해야 함
+  - **Gate3 이월 조건**: (1) architect 를 MCP server 로 재구현 (2) MCP config 에서만 `${user_config.gemini_api_key}` 치환 (3) skill/agent content 는 architect 호출 결과만 참조
+  - **교훈**: 보안 불변식(sensitive 차단)은 개발자의 편의를 위해 우회할 수 없다. 우회하려 하면 로깅 시스템 전체에 전파된다. 우회 대신 **시크릿을 요구하지 않는 설계**(로컬 Ollama)가 정답. Unix 홈 디렉토리 관례 비유(`~/.aws/credentials` 등)는 **CLI 도구가 평문 키를 로그에 재기록하지 않는다**는 전제 위에 성립 — Ensembra 는 그 전제를 깼었음

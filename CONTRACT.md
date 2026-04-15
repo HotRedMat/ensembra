@@ -237,49 +237,42 @@ Performer 는 이종(heterogeneous) 이다. Conductor 는 각 Performer 의 `tra
 3. 블록이 없거나 JSON 파싱 실패 시 Performer 출력을 `status: "error"`, `_error.code: "format"` 로 마킹. §5 에러 규약에 따름.
 4. 자연어 서술은 절대 Conductor 가 재정리하지 않는다. `summary`, `arguments` 는 Performer 가 선언한 그대로 보존.
 
-### 8.4 Gemini 키 취급 (v0.5.1+ `sensitive: false` — 의식적 타협)
+### 8.4 Architect Transport 및 Gemini 폐지 (v0.6.0+)
 
-**배경**: v0.5.0 은 OS 키체인 단일 경로로 복귀했으나 실전 테스트에서 Claude Code 가 sensitive userConfig 값을 **skill/agent content 에서 의도적으로 차단** (`[sensitive option 'gemini_api_key' not available in skill content]` placeholder) 하는 것을 확인. 바이너리 문서 문자열: `"Available as ${user_config.KEY} in MCP/LSP server config, hook commands, and (non-sensitive only) skill/agent content"`. Ensembra 의 architect Performer 는 skill 내부에서 curl 로 Gemini 를 호출하므로 sensitive 필드와 근본적으로 호환 불가. v0.5.1 은 **`sensitive: false`** 로 의식적 타협.
+**배경**: v0.5.1 은 `gemini_api_key.sensitive: false` 로 선언해 skill/agent content 에서 `${user_config.gemini_api_key}` 치환이 작동하도록 했다. 그러나 이 치환은 **스킬 호출 시 시스템 프롬프트로 주입** 되어, 매 `/ensembra:run` 실행마다 세션 로그(`~/.claude/projects/.../*.jsonl`)와 화면 트랜스크립트에 키가 평문으로 기록되는 구조적 유출이 확인됨. v0.5.1 의 SECURITY.md 는 이 위험을 residual risk 로만 기록했지만, 실측 결과 "residual" 이 아니라 "매 호출마다 필연" 에 가까웠다.
 
-**저장**:
-- `plugin.json` 에 `userConfig.gemini_api_key` (`type: "string"`, `sensitive: false`) 선언
-- Claude Code 가 `~/.claude/settings.json` 의 `pluginConfigs.ensembra@ensembra.options.gemini_api_key` 에 **평문 저장**
-- 파일 권한 `chmod 0600` (같은 사용자 계정만 접근)
-- **Unix 홈 디렉토리 관례 계열** — AWS `~/.aws/credentials`, gcloud, netrc, gitconfig, ssh config 등과 동일 수준 보호
+**v0.6.0 결정**: Gemini 경로를 폐지하고 architect 를 **Ollama(qwen2.5:14b)** 로 이전. `sensitive: true` 불변식 복구.
 
-**설정 경로** (사용자):
+**이동 후 architect Transport**:
+- 기본: `ollama` / `qwen2.5:14b` (로컬 HTTP, 시크릿 불필요)
+- 엔드포인트: `${user_config.ollama_endpoint}` (비시크릿 — 치환 가능)
+- 폴백: Ollama 가용 실패 시 Claude 서브에이전트(`sonnet`)
 
-```
-1. /plugin                            (Claude Code 세션 내부)
-2. ↓ 로 ensembra 선택
-3. Enter                              (상세 화면 진입)
-4. "Configure options" 서브메뉴 선택 → Enter
-5. dialog 에 gemini_api_key 입력 (sensitive 이므로 입력 masking)
-6. Save
-7. /reload-plugins
-```
-
-**참조 방법** (스킬·에이전트·훅):
-- 스킬·에이전트 본문: `${user_config.gemini_api_key}` 템플릿 치환
-- 훅 subprocess: `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` 환경변수
-
-**전송 예시**:
+**호출 예시** (v0.6.0+):
 ```bash
-curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${user_config.gemini_api_key}" \
-  -H 'Content-Type: application/json' -d "$payload"
+curl -s -X POST "${user_config.ollama_endpoint}/api/generate" \
+  -H 'Content-Type: application/json' \
+  -d "{\"model\":\"qwen2.5:14b\",\"prompt\":\"$prompt\",\"stream\":false}"
 ```
 
-**빈 값 처리**:
-- 키 미설정 시 architect Performer 는 Claude 서브에이전트로 폴백
-- Conductor 가 `⚠ architect: gemini → claude-sonnet (fallback)` 배지 표시
-- 파이프라인 완전 작동
+**gemini_api_key 필드의 운명**:
+- `plugin.json` 의 `userConfig.gemini_api_key` 는 **선언은 유지** (향후 MCP 기반 Gemini 재도입을 위해) 하되 `sensitive: true` 로 복구
+- 스킬·에이전트 본문에서 `${user_config.gemini_api_key}` 참조는 **모두 제거**
+- 사용자가 키를 입력하더라도 v0.6.0 파이프라인은 사용하지 않음 (데이터는 OS 키체인에 남되 Ensembra 는 접근하지 않음)
 
-**로그 마스킹**: `x-goog-api-key`, `Authorization`, `key=`, `CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY`, `user_config.gemini_api_key`, `GEMINI_API_KEY` 전부 `[REDACTED]`
+**Gemini 재도입 전제** (Gate3 이월):
+1. architect Performer 를 **MCP server** 또는 **hook command** 로 이전
+2. `sensitive: true` 값이 접근 가능한 컨텍스트(MCP server config, hook env var `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY`) 에서만 Gemini 호출
+3. skill/agent content 는 architect 호출 결과만 참조하고 키는 절대 만지지 않음
 
-**제거된 경로** (v0.5.0 에서 모두 제거):
-- `~/.config/ensembra/env` 파일 폴백
-- `bin/ensembra-set-key` 스크립트
-- `/ensembra:config → 5) c)` 에서 대화창 키 붙여넣기
+**로그 마스킹**: `x-goog-api-key`, `Authorization`, `key=`, `CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY`, `user_config.gemini_api_key`, `GEMINI_API_KEY` 전부 `[REDACTED]` (v0.5.x 관례 유지)
+
+**제거된 경로** (v0.5.0~v0.6.0 누적):
+- `~/.config/ensembra/env` 파일 폴백 (v0.5.0)
+- `bin/ensembra-set-key` 스크립트 (v0.5.0)
+- `/ensembra:config → 5) c)` 대화창 키 붙여넣기 (v0.5.0)
+- `sensitive: false` 평문 저장 + `${user_config.gemini_api_key}` skill content 치환 (v0.6.0)
+- architect 의 Gemini Transport 기본값 (v0.6.0)
 - `/ensembra:config → 5) c)` 에서 인터랙티브 파일 쓰기
 
 **이전 버전 참고**:

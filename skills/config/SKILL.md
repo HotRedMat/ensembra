@@ -44,8 +44,8 @@ Ensembra 설정
 ### (1) Performers
 역할 7개 나열 → 선택 → 모델 picker (Live 조회):
 - Ollama: `Bash curl -s http://localhost:11434/api/tags` → `.models[].name`
-- Gemini: `Bash curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=${CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY}"` → `.models[]` (filter: `generateContent` in `supportedGenerationMethods`). 키가 비어있으면 Gemini 섹션 생략하고 "키 미설정 — plugin disable/enable 로 재설정 가능" 안내
 - Claude: 정적 목록 (opus/sonnet/haiku + 현재 세션 ID)
+- Gemini: **v0.6.0 에서 제거됨** (architect 기본 Transport 가 Ollama 로 이관). Gemini 옵션은 picker 에 노출하지 않음. Gate3 에서 MCP 기반 재도입 예정
 숫자 입력으로 선택.
 
 ### (2) Presets
@@ -71,51 +71,14 @@ Ensembra 설정
 ### (5) Transports
 - a) Ollama endpoint (기본 `http://localhost:11434`)
 - b) Ollama health check → `curl -s /api/tags`
-- c) **Gemini API key 상태 표시 + `/plugin` UI 안내**
-- d) Gemini health check
-- e) Claude 폴백 모델 선택
+- c) Claude 폴백 모델 선택
 
-#### (5)c Gemini API key (v0.5.0+ 순수 Claude Code userConfig)
+#### (5)c Claude 폴백 모델
+Ollama 불가 시 architect/security/qa 가 사용할 Claude 모델 선택 (opus/sonnet/haiku).
 
-v0.5.0 부터는 **Claude Code 의 네이티브 `userConfig` + OS 키체인** 이 유일한 저장 경로다. 파일 폴백, bin 스크립트, 대화 붙여넣기 경로는 모두 제거됨.
+#### Gemini (v0.6.0 에서 제거)
 
-**스킬이 (5)c 진입 시 수행할 것**:
-
-1. `${user_config.gemini_api_key}` 치환 결과의 길이 확인 (값은 출력 금지)
-2. 다음 안내 출력:
-
-```
-Ensembra 는 Claude Code 네이티브 userConfig 메커니즘으로 키를 관리합니다.
-
-Gemini API key 상태:
-  현재 설정 여부: ✓ set (length=39)    또는   ✗ not set
-  저장 위치:    OS 키체인 (macOS Keychain / .credentials.json)
-  참조 방식:    ${user_config.gemini_api_key} 템플릿 치환
-
-설정 / 교체 / 삭제 방법:
-
-  1. Claude Code 에서 /plugin 실행
-  2. ↓ 로 ensembra 선택
-  3. Enter (상세 화면 진입)
-  4. "Configure options" 메뉴 선택 → Enter
-  5. dialog 에서 gemini_api_key 필드에 키 입력
-     (sensitive 필드이므로 입력이 숨겨짐)
-  6. Save / Apply
-  7. /reload-plugins 로 반영
-
-키가 비어있으면 architect Performer 는 Claude 서브에이전트로
-자동 폴백됩니다. Ensembra 는 Gemini 없이도 완전히 작동합니다.
-
-무료 키 발급: https://aistudio.google.com/app/apikey
-```
-
-3. 사용자 입력 없이 상위 메뉴로 복귀 (이 스킬은 키를 직접 저장하지 않음 — Claude Code 에 위임)
-
-#### (5)d Gemini health check
-`${user_config.gemini_api_key}` 치환값으로 `curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=${user_config.gemini_api_key}"` 실행. 응답 200 + 모델 수 표시, 에러면 에러 메시지만 표시 (키 값 출력 금지).
-
-#### (5)e Claude 폴백 모델
-Gemini/Ollama 불가 시 architect/security/qa 가 사용할 Claude 모델 선택 (opus/sonnet/haiku).
+v0.5.x 까지 (5)c 는 Gemini API key 상태 표시 + (5)d 는 Gemini health check 이었다. v0.6.0 은 Gemini 경로 전체를 폐지했으므로 picker 에서도 제거. `gemini_api_key` userConfig 필드는 `sensitive: true` 로 선언만 유지되며 picker 는 이 값을 **절대 건드리지 않는다** (읽기·쓰기·길이 확인 모두 금지). 상세 이유는 `SECURITY.md` 및 `CONTRACT.md §8.4` 참조. Gate3 MCP 재도입 시 이 섹션을 복원한다.
 
 ### (6) Timeouts
 Ollama/Gemini/Claude-subagent/Deep-Scan 각각 초 단위.
@@ -228,10 +191,9 @@ Ensembra > Plan Tier
 ## 스키마 참조
 `schemas/config.json` 의 JSON Schema 를 준수. 저장 시 스키마 검증 수행.
 
-## 보안
-- Gemini API 키는 **Claude Code 네이티브 `userConfig.gemini_api_key` + `sensitive: true`** 로 OS 키체인에 저장됨 (v0.5.0+)
-- **단일 경로**: macOS Keychain 또는 `~/.claude/.credentials.json`. 파일 폴백·bin 스크립트·대화 붙여넣기 경로 모두 제거됨
-- 이 스킬은 키 값을 화면에 **절대 출력하지 않음** — 존재 여부와 길이만 표시
-- `config.json` 에는 시크릿 포함 금지 (키는 Claude Code 가 관리)
+## 보안 (v0.6.0+)
+- **이 스킬은 `gemini_api_key` 를 절대 읽지·쓰지·길이 측정도 하지 않는다** (v0.5.x 의 치환 기반 노출 경로 재현 방지)
+- Gemini 경로 전체가 v0.6.0 에서 폐지됨 — architect 기본 Transport 는 Ollama
+- `config.json` 에는 시크릿 포함 금지 — 모든 시크릿은 Claude Code `userConfig` + OS 키체인에 위임
 - `SECURITY.md` 마스킹 규칙 준수 — 로그·보고서에서 `x-goog-api-key`, `key=`, `GEMINI_API_KEY`, `CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY`, `user_config.gemini_api_key` 모두 `[REDACTED]`
-- 키 설정은 Claude Code 의 `/plugin → ensembra → Configure options` UI 에만 위임 — 이 스킬은 키 입력을 직접 받지 않음
+- Gate3 MCP 재도입 시점에 이 섹션을 재검토

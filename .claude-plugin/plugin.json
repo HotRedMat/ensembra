@@ -1,6 +1,6 @@
 {
   "name": "ensembra",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Multi-agent orchestrator plugin for Claude Code — agents perform in concert through a 5-phase pipeline (Gather → Deliberate → Execute → Audit → Document) with Reuse-First cross-cutting policy.",
   "author": {
     "name": "Seungho Lee",
@@ -21,9 +21,9 @@
   "userConfig": {
     "gemini_api_key": {
       "type": "string",
-      "title": "Gemini API key (stored in ~/.claude/settings.json — rotate if the file is shared)",
-      "description": "Google AI Studio API key for the architect performer. Get a free key at https://aistudio.google.com/app/apikey. Leave blank to disable Gemini — the architect will fall back to a Claude sub-agent automatically. STORAGE NOTE: Claude Code's sensitive-value OS-keychain path cannot be accessed from skill or agent content (confirmed against 2.1.109), so this field is intentionally non-sensitive and stored in plaintext under ~/.claude/settings.json (pluginConfigs.ensembra@ensembra.options.gemini_api_key). The file is in your private home directory but readable by any process running as your user. Rotate the key at https://aistudio.google.com/app/apikey if your settings.json is ever shared or backed up to a cloud service.",
-      "sensitive": false
+      "title": "Gemini API key (optional — architect uses Ollama by default in v0.6.0+)",
+      "description": "Google AI Studio API key. In v0.6.0+ the architect performer defaults to Ollama (qwen2.5:14b); Gemini is not required. This field is reserved for future MCP-based Gemini integration. Leave blank. Stored as a sensitive value in the OS keychain (not accessible from skill/agent content — this is the security invariant that v0.6.0 restored).",
+      "sensitive": true
     },
     "ollama_endpoint": {
       "type": "string",

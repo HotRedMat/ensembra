@@ -2,90 +2,62 @@
 
 ## 시크릿 취급 정책 (Q5, Q7 결정 반영)
 
-Ensembra 의 유일한 시크릿은 Gemini API 키다. **`~/.claude/settings.json` 내 평문 저장** (v0.5.1+). Unix 홈 디렉토리 관례(AWS/gcloud/git credentials 등과 동일).
+**v0.6.0 핵심 원칙**: Ensembra 파이프라인은 시크릿을 **요구하지 않는다**. 기본 구성에서 architect 는 로컬 Ollama 를, 나머지 Performer 는 Claude 세션 토큰(자동) 또는 로컬 Ollama 를 사용한다. 외부 API 키가 필요한 Performer 는 **없다**.
 
-## Gemini API 키 저장 (v0.5.1+)
+## Gemini API 키 취급 (v0.6.0+)
 
-**왜 평문인가** — Claude Code 2.1.109 바이너리 리버싱으로 확인된 규격:
+**결론**: v0.6.0 은 Gemini 경로를 폐지했다. `userConfig.gemini_api_key` 필드는 선언만 남아있고(`sensitive: true`), 파이프라인은 이 값을 참조하지 않는다.
 
-> "Available as `${user_config.KEY}` in MCP/LSP server config, hook commands, **and (non-sensitive only) skill/agent content**."
+### 왜 폐지했는가 — 구조적 유출
 
-즉 `sensitive: true` 로 선언하면 OS 키체인에 저장되지만 **skill/agent content 에서는 placeholder 로 차단** 된다 (`[sensitive option 'gemini_api_key' not available in skill content]`). Ensembra 의 architect Performer 는 skill 에서 curl 로 Gemini 를 호출하는 구조라 **sensitive 필드와 근본적으로 호환 불가**. 따라서 v0.5.1 부터는 `sensitive: false` 로 선언하여 `${user_config.gemini_api_key}` 치환이 skill/agent content 에서 정상 작동하도록 한다.
+v0.5.1 은 `sensitive: false` 로 선언하여 `${user_config.gemini_api_key}` 가 skill/agent content 에서 치환되도록 했다. Claude Code 는 스킬 호출 시 이 치환 결과를 **시스템 프롬프트** 에 주입하며, 시스템 프롬프트는 자동으로 `~/.claude/projects/.../*.jsonl` 세션 로그와 화면 트랜스크립트에 기록된다. 결과적으로 매 `/ensembra:run` 실행이 키를 평문으로 재유출하는 구조였다. v0.5.1 의 residual risk 로 기록된 위험이 실측상 "매 호출마다 필연"이라 판명되어 v0.6.0 에서 구조적으로 제거.
 
-**저장 위치**: `~/.claude/settings.json`
-```json
-{
-  "pluginConfigs": {
-    "ensembra@ensembra": {
-      "options": {
-        "gemini_api_key": "AIza...",
-        "ollama_endpoint": "http://localhost:11434"
-      }
-    }
-  }
-}
-```
+### v0.6.0 의 architect 이관
 
-**파일 권한**: Claude Code 가 이 파일을 `0600` 으로 유지한다 (사용자만 읽기/쓰기). 다른 사용자 계정에서 접근 불가.
+- **기본 Transport**: `ollama` / `qwen2.5:14b` (`${user_config.ollama_endpoint}` 는 비시크릿이라 치환 가능·유출 무관)
+- **폴백**: Ollama 미가용 시 Claude 서브에이전트(`sonnet`)
+- **Gemini**: 파이프라인 기본 경로에서 제거. 사용자가 키를 입력해도 Ensembra 는 사용하지 않음
 
-**설정 방법**:
-1. Claude Code 에서 `/plugin` 실행
-2. ↓ 로 `ensembra` 선택
-3. Enter (상세 화면 진입)
-4. "Configure options" 서브메뉴 선택 → Enter
-5. dialog 에 `gemini_api_key` 입력
-   - **⚠ 비시크릿 필드이므로 입력이 화면에 표시됨** (sensitive masking 없음)
-   - 뒤에서 엿보는 사람이 없는지 확인
-6. `ollama_endpoint` 는 기본값 유지 또는 조정
-7. Save
-8. `/reload-plugins`
+### gemini_api_key 필드의 현재 역할
 
-**참조 방법** (스킬·에이전트):
-- `${user_config.gemini_api_key}` 템플릿 치환 — Claude Code 가 load-time 에 실제 값으로 치환
+- `plugin.json` 에 `type: "string"`, `sensitive: true` 로 선언
+- Claude Code 는 이 값을 **OS 키체인** (macOS Keychain 또는 `~/.claude/.credentials.json`) 에 저장
+- skill/agent content 에서 접근 시 `[sensitive option 'gemini_api_key' not available in skill content]` placeholder 치환 — **이것이 의도된 불변식**
+- 향후 MCP server / hook 기반 architect 재도입 시점에 사용 예정 (Gate3 이월)
 
-**키 없음 처리**: architect Performer 는 Claude 서브에이전트로 자동 폴백. Ensembra 는 Gemini 없이도 완전히 작동.
+### Gemini 재도입 전제 (Gate3)
 
-## 위협 모델 (v0.5.1)
+1. architect Performer 를 MCP server 또는 hook command 로 이전
+2. 해당 컨텍스트에서만 `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` 또는 MCP server config 치환으로 키 접근
+3. skill/agent content 는 architect 호출 결과만 참조하고 키를 직접 만지지 않음
+
+## 위협 모델 (v0.6.0)
 
 **보호**:
-- 같은 사용자 이외의 계정에서 파일 접근 불가 (`chmod 0600`)
+- skill/agent content 를 통한 시크릿 유출 경로 **구조적 제거** (`sensitive: true` 불변식)
+- 로컬 Ollama 는 네트워크에 시크릿을 전송하지 않음
 - 레포·git 에 커밋되지 않음 (`~/.claude/` 는 사용자 홈 디렉토리)
-- Claude Code 출력·Task Report·transfer doc 에 키 값 유출 방지 (마스킹 규칙)
 
 **완화되지 않는 위험**:
-- 사용자가 `settings.json` 을 의도적으로 공유하면 유출 (예: 지원 요청에 첨부)
-- 홈 디렉토리 전체 백업 (Time Machine / iCloud Documents) 시 백업에 포함
-- Claude Code 대화 히스토리 (`~/.claude/history.jsonl`) 에 사용자가 키를 붙여넣으면 그쪽에도 기록
-- 같은 사용자 권한으로 실행되는 다른 프로세스는 파일 읽기 가능 (Unix 관례)
+- 사용자가 다른 용도(수동 curl, 개인 스크립트)로 Gemini 키를 사용하다 로그에 남기는 경우 → Ensembra 책임 범위 외
+- 사용자가 `settings.json` 또는 OS 키체인 백업을 공유하는 경우 → Unix 공통 위협
 
 **완화 권장**:
-- 지원·디버깅 시 `settings.json` 을 원문 공유하지 말고 `gemini_api_key` 를 수동 마스킹 후 공유
-- 주기적 키 로테이션 (3~6개월)
-- 공용 머신·공유 계정 사용 시 키 설정 금지 (architect 는 Claude 폴백으로 사용)
+- 현재 Ensembra 만 쓴다면 `userConfig.gemini_api_key` 는 **빈 값**으로 유지
+- 키가 이미 설치돼 있다면 `/plugin → ensembra → Configure options` 에서 삭제 후 `/reload-plugins`
+- Gate3 전까지 Gemini 기능이 필요하면 Ensembra 외부에서 직접 호출
 
-## 왜 sensitive 를 포기했는가 — 기술적 제약
+## v0.6.0 가 되돌린 경로
 
-v0.5.0 에서 `sensitive: true` 로 복귀 시도 후 실제 테스트에서 Claude Code 가 skill 본문의 `${user_config.gemini_api_key}` 를 `[sensitive option 'gemini_api_key' not available in skill content]` placeholder 로 치환함을 확인. Ensembra 의 architect 가 skill 내 Bash 도구로 curl 을 돌리는 아키텍처에서는 이 placeholder 로는 Gemini 호출 불가능.
+v0.5.x 에서 추가됐다가 v0.6.0 에서 제거된 것:
+- ❌ `sensitive: false` 평문 저장
+- ❌ `${user_config.gemini_api_key}` 스킬·에이전트 content 치환
+- ❌ architect 의 Gemini Transport 기본값
 
-재설계 대안 (hook / MCP server 로 architect 를 이관) 은 Ensembra 의 "모든 Performer 는 agent/skill" 설계 원칙과 충돌. 따라서 v0.5.1 은 **"sensitive 포기 + Unix 홈 디렉토리 평문 관례"** 를 의식적 트레이드오프로 채택.
-
-참고: 대부분의 CLI 도구가 이미 같은 관례를 따른다:
-- `~/.aws/credentials` — AWS CLI 평문
-- `~/.config/gcloud/credentials.db` — gcloud (sqlite)
-- `~/.netrc` — curl, wget 등 (plaintext)
-- `~/.gitconfig` — git (plaintext)
-- `~/.ssh/config` — ssh (plaintext)
-
-Ensembra 의 `~/.claude/settings.json` 평문 저장은 이 관례의 연장선이다.
-
-## 제거된 경로 (v0.5.0~v0.5.1)
-
-다음 경로들은 v0.3.x~v0.4.x 의 워크어라운드였음. 모두 제거:
+v0.3.x~v0.5.0 에서 이미 제거된 것 (v0.6.0 도 유지):
 - ❌ `~/.config/ensembra/env` 파일 폴백
 - ❌ `bin/ensembra-set-key` 스크립트
-- ❌ `/ensembra:config` 인터랙티브 키 입력 플로우
 - ❌ 대화창 키 붙여넣기 경로
-- ❌ `sensitive: true` (v0.5.0 에서 시도했으나 skill content 차단으로 실패)
 
 ## 대안 Performer 는 시크릿 불필요
 
