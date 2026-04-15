@@ -69,37 +69,160 @@ Performer 호출 방식은 3종 혼용으로 확정:
 
 ## STEP 0 확인 결과 (Claude Code 공식 스펙)
 
-출처:
+출처 (2026-04-15 확인):
 - https://code.claude.com/docs/en/plugins
 - https://code.claude.com/docs/en/sub-agents
-- https://code.claude.com/docs/en/plugins-reference (미확인, Gate2 이전 재확인 필요)
+- https://code.claude.com/docs/en/plugins-reference ✅ 확인
+- https://code.claude.com/docs/en/plugin-marketplaces ✅ 확인
 
-### 매니페스트 경로
-- 플러그인 매니페스트는 **`<plugin-root>/.claude-plugin/plugin.json`** 에 위치한다.
-- `commands/`, `agents/`, `skills/`, `hooks/`, `.mcp.json`, `.lsp.json`, `bin/`, `settings.json` 은 **plugin root** 에 두며 `.claude-plugin/` **안에 넣으면 안 된다**.
-- 주의: Gate1 에서는 `plugin.json` 생성 금지 (publish 불가역성). 따라서 현재 레포는 standalone `.claude/` 레이아웃을 사용한다. Gate2 에서 플러그인으로 승격할 때 `.claude/agents/*` → `<plugin-root>/agents/*` 로 이동 필요.
+### plugin.json 완전 스키마
 
-### plugin.json 필수·권장 필드
-- 필수: `name`, `description`, `version`
-- 권장: `author`(object: name, email, url), `homepage`, `repository`, `license`
-- 참고: 버전은 SemVer. `name` 은 스킬/커맨드 네임스페이스 프리픽스로 사용됨 (`/ensembra:<skill>`).
+**위치**: `<plugin-root>/.claude-plugin/plugin.json`
+**모든 필드 선택**: 매니페스트 자체가 선택 사항이며, 생략 시 컴포넌트는 기본 디렉토리에서 자동 발견됨. 매니페스트에 포함할 경우 `name` 만 **유일한 필수 필드**.
 
-### agents frontmatter 규약 (`.claude/agents/*.md` 또는 plugin `agents/*.md`)
-- 필수: `name`, `description`
-- 선택: `tools` (쉼표 구분 문자열), `model` (`opus`|`sonnet`|`haiku`), `disallowedTools`, `permissionMode`, `mcpServers`, `hooks`, `maxTurns`, `skills`, `initialPrompt`, `memory`, `effort`, `background`, `isolation`, `color`
-- 플러그인에서 로드되는 에이전트는 보안상 `hooks`, `mcpServers`, `permissionMode` 필드가 **무시**됨. 필요하면 사용자 `.claude/agents/` 로 복사하거나 `settings.json permissions.allow` 활용.
-- 에이전트 본문(Markdown)은 시스템 프롬프트로 사용됨.
+**메타데이터 필드** (모두 선택):
+- `version` (string, SemVer) — 버전 관리, plugin.json 이 marketplace.json 보다 우선
+- `description` (string) — 플러그인 목적 요약
+- `author` (object) — `name`, `email`, `url`
+- `homepage` (string) — 문서 URL
+- `repository` (string) — 소스 URL
+- `license` (string) — SPDX 식별자 (예: `"MIT"`)
+- `keywords` (array) — 검색 태그
 
-### 마켓플레이스 등록
-- 공식 마켓플레이스 제출은 claude.ai/settings/plugins/submit 또는 platform.claude.com/plugins/submit 인앱 폼.
-- 별도 `marketplace.json` 요구사항은 공식 문서에서 확인되지 않음 — Gate2 이전 `plugin-marketplaces` 문서 재확인 필요.
+**컴포넌트 경로 필드** (기본 디렉토리 대체용, 모두 선택):
+- `skills` (string|array) — 기본 `skills/` 대체. `<name>/SKILL.md` 구조
+- `commands` (string|array) — 기본 `commands/` 대체. flat `.md` 파일
+- `agents` (string|array) — 기본 `agents/` 대체
+- `hooks` (string|array|object) — 기본 `hooks/hooks.json` 대체 또는 인라인
+- `mcpServers` (string|array|object) — 기본 `.mcp.json` 대체 또는 인라인
+- `lspServers` (string|array|object) — 기본 `.lsp.json` 대체 또는 인라인
+- `outputStyles` (string|array) — 기본 `output-styles/` 대체
+- `monitors` (string|array|object) — 기본 `monitors/monitors.json` 대체
+- `userConfig` (object) — 설치 시 사용자에게 물을 값. `sensitive: true` 면 키체인 저장
+- `channels` (array) — Telegram/Slack 스타일 메시지 채널
 
-### 불확실 항목 (TODO, Gate2 이전 해소)
-1. `TODO(gate2)`: `plugins-reference` 페이지에서 `plugin.json` 의 전체 JSON Schema 와 옵션 필드 목록 확인.
-2. `TODO(gate2)`: 팀/사내 마켓플레이스 레포 구조 (`.claude-plugin/marketplace.json` 유사 파일 존재 여부) 확인.
-3. `TODO(gate2)`: 플러그인 배포 시 아이콘/스크린샷 요구사항 확인.
-4. `TODO(gate2)`: `settings.json` 의 `agent` 키로 오케스트레이터를 main thread 로 활성화하는 방식이 Ensembra 모델과 적합한지 검증.
-5. `TODO(gate2)`: agents 간 통신이 필요한 경우 `sub-agents` vs `agent-teams` 어느 쪽을 쓸지 결정 (`/en/agent-teams` 문서 미확인).
+**경로 규칙**:
+- 모든 경로는 plugin root 기준 상대 경로, `./` 로 시작 필수
+- 커스텀 경로를 지정하면 **기본 디렉토리는 스캔되지 않음** (대체 관계)
+- 기본 + 추가 디렉토리 병행하려면 배열로: `"skills": ["./skills/", "./extras/"]`
+
+**환경 변수** (hook/MCP/agent/skill 본문에 치환 가능):
+- `${CLAUDE_PLUGIN_ROOT}` — 플러그인 설치 디렉토리. 업데이트 시 변경되므로 **파일 쓰기 금지**
+- `${CLAUDE_PLUGIN_DATA}` — 영속 데이터 디렉토리 (`~/.claude/plugins/data/{id}/`). 업데이트 간 유지됨
+
+### 플러그인 디렉토리 레이아웃 (표준)
+
+```
+ensembra/
+├── .claude-plugin/
+│   └── plugin.json              # 매니페스트 (여기에만 위치)
+├── agents/                      # 서브에이전트 (plugin root)
+│   ├── orchestrator.md
+│   ├── planner.md
+│   ├── architect.md
+│   ├── developer.md
+│   ├── security.md
+│   ├── qa.md
+│   ├── devils-advocate.md
+│   └── scribe.md
+├── skills/                      # 스킬 (plugin root)
+│   ├── ensembra-run/SKILL.md
+│   ├── ensembra-config/SKILL.md
+│   ├── ensembra-transfer/SKILL.md
+│   └── ensembra-report/SKILL.md
+├── LICENSE
+├── README.md
+└── CHANGELOG.md
+```
+
+**⚠ 중요**: `agents/`, `skills/`, `commands/`, `hooks/` 등은 **plugin root** 에 두며, `.claude-plugin/` **안에 넣으면 컴포넌트가 로드되지 않음**. `.claude-plugin/` 안에는 **오직 `plugin.json` 만** 둔다.
+
+### Agent frontmatter (플러그인에서 로드 시)
+
+지원 필드: `name`, `description`, `model`, `effort`, `maxTurns`, `tools`, `disallowedTools`, `skills`, `memory`, `background`, `isolation`, `color`
+
+**보안상 미지원** (플러그인 agent 에선 무시됨): `hooks`, `mcpServers`, `permissionMode`
+- 필요 시 사용자 `.claude/agents/` 로 복사하거나 `settings.json permissions.allow` 활용
+- Ensembra 는 이 3개 필드를 orchestrator.md 에서 쓰지 않으므로 **문제 없음**
+
+`isolation` 유효값: `"worktree"` 만.
+
+### 매니페스트 필수 최소 예시 (Ensembra 용 초안)
+
+```json
+{
+  "name": "ensembra",
+  "version": "1.0.0",
+  "description": "Multi-agent orchestrator plugin for Claude Code — agents perform in concert",
+  "author": {
+    "name": "Seungho Lee",
+    "email": "misstal80@gmail.com"
+  },
+  "homepage": "https://github.com/HotRedMat/ensembra",
+  "repository": "https://github.com/HotRedMat/ensembra",
+  "license": "MIT",
+  "keywords": ["orchestrator", "multi-agent", "deliberation", "review", "audit"]
+}
+```
+
+### marketplace.json 완전 스키마
+
+**위치**: `<marketplace-root>/.claude-plugin/marketplace.json`
+
+**필수 필드**:
+- `name` (string, kebab-case) — 마켓플레이스 식별자, 공개됨
+- `owner` (object) — `name` 필수, `email` 선택
+- `plugins` (array) — 플러그인 목록
+
+**선택 메타데이터**:
+- `metadata.description` (string)
+- `metadata.version` (string)
+- `metadata.pluginRoot` (string) — 상대 경로 prefix (예: `"./plugins"`)
+
+**Plugin entry 필드**:
+- `name` (필수) — 플러그인 식별자
+- `source` (필수) — 다음 유형 중 하나:
+  - 상대 경로: `"./plugins/my-plugin"` (마켓플레이스 레포 내 로컬)
+  - `github`: `{"source": "github", "repo": "owner/repo", "ref": "...", "sha": "..."}`
+  - `url`: `{"source": "url", "url": "https://...", "ref": "...", "sha": "..."}`
+  - `git-subdir`: `{"source": "git-subdir", "url": "...", "path": "tools/plugin", "ref": "..."}`
+  - `npm`: `{"source": "npm", "package": "@org/plugin", "version": "^2.0.0"}`
+- 선택: `description`, `version`, `author`, `license`, `keywords`, `category`, `tags`, `strict` (기본 true)
+
+**Reserved names** (사용 불가): `claude-code-marketplace`, `anthropic-marketplace`, `official-claude-plugins` 등 — 공식 Anthropic 용으로 예약됨.
+
+### Ensembra 배포 전략 (Q4 공개 마켓플레이스 결정 기반)
+
+두 가지 방식 가능:
+
+**(A) 단일 플러그인 레포** (권장, 간단):
+- 이 레포(`HotRedMat/ensembra`) 자체를 플러그인으로 구성
+- `.claude-plugin/plugin.json` 만 있으면 됨
+- 사용자는 `claude plugin marketplace add HotRedMat/ensembra` 로 추가 후 설치
+- 또는 더 간단히: 누군가의 마켓플레이스에 등록 요청하거나 공식 Anthropic 마켓플레이스(claude.ai/settings/plugins/submit) 에 제출
+
+**(B) 자체 마켓플레이스 + 플러그인 공존**:
+- 같은 레포에 `.claude-plugin/marketplace.json` + `.claude-plugin/plugin.json` 둘 다
+- 마켓플레이스 entry 에서 `source: "./"` 로 자기 자신 지칭
+- 확장성 있음 (나중에 `ensembra-bridge-*` 같은 보조 플러그인 추가 가능)
+
+**결정**: Gate2 초기엔 **(A) 단일 플러그인 레포**. 나중에 보조 플러그인이 생기면 (B) 로 마이그레이션. `metadata.pluginRoot` 로 경로 관리.
+
+### 공식 마켓플레이스 제출
+
+제출 폼: https://claude.ai/settings/plugins/submit  또는  https://platform.claude.com/plugins/submit
+- 아이콘/스크린샷 요구사항은 문서에 명시되지 않음 (제출 폼에서 확인 예정)
+- 검증: `claude plugin validate .` 또는 `/plugin validate`
+
+### 해소된 TODO
+1. ✅ **`plugin.json` 전체 스키마** — 위에 완전 기술
+2. ✅ **마켓플레이스 레포 구조** — `.claude-plugin/marketplace.json` 스키마 완전 확인
+3. ⏸ **아이콘/스크린샷 요구사항** — 공식 제출 폼에서 확인 (Gate3 이전)
+4. ⏸ **`settings.json agent` 키 적합성** — Ensembra 는 `/ensembra:run` 스킬 진입점 방식이라 `settings.json agent` 로 main thread 활성화 **불필요**. 일반 서브에이전트 호출로 충분. 해소됨.
+5. ⏸ **sub-agents vs agent-teams** — Ensembra 는 Conductor 가 서브에이전트를 순차 호출하는 단일 세션 모델이므로 **sub-agents** 가 맞음. `agent-teams` 는 다중 세션 협업용으로 Ensembra 범위 밖.
+
+### Gate2 진입 조건
+**모두 해소됨** ✅. Gate2 진입 가능.
 
 ---
 
