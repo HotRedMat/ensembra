@@ -1,10 +1,40 @@
-# Ensembra
+<p align="center">
+  <img src="./assets/icon-256.png" width="160" height="160" alt="Ensembra icon"/>
+</p>
 
-> Where agents perform in concert — a multi-agent orchestrator plugin for Claude Code.
+<h1 align="center">Ensembra</h1>
 
-[![plugin validate](https://img.shields.io/badge/plugin%20validate-passing-brightgreen)](https://github.com/HotRedMat/ensembra)
-[![version](https://img.shields.io/badge/version-0.1.0-blue)](https://github.com/HotRedMat/ensembra/releases)
-[![license](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
+<p align="center">
+  <em>Where agents perform in concert — a multi-agent orchestrator plugin for Claude Code.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/HotRedMat/ensembra/releases"><img src="https://img.shields.io/badge/version-0.1.0-blue" alt="version"/></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="license"/></a>
+  <img src="https://img.shields.io/badge/plugin%20validate-passing-brightgreen" alt="plugin validate"/>
+  <img src="https://img.shields.io/badge/verification-end--to--end-brightgreen" alt="verification"/>
+</p>
+
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="./assets/screenshot-run.png" width="360" alt="/ensembra:run feature output"/><br/>
+      <sub><code>/ensembra:run feature</code> — 5-phase pipeline with consensus and reuse evaluation</sub>
+    </td>
+    <td align="center">
+      <img src="./assets/screenshot-config.png" width="360" alt="/ensembra:config Reuse-First Policy picker"/><br/>
+      <sub><code>/ensembra:config</code> — interactive picker with cascade-safe custom mode</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" colspan="2">
+      <img src="./assets/screenshot-transfer.png" width="500" alt="/ensembra:transfer output"/><br/>
+      <sub><code>/ensembra:transfer</code> — 10-section handover document with devils-advocate pitfalls</sub>
+    </td>
+  </tr>
+</table>
 
 ## What is Ensembra?
 

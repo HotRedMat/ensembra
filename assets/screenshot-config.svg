@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 800" width="1280" height="800">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b"/>
+      <stop offset="100%" stop-color="#0f0d2e"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="800" fill="url(#bg)"/>
+
+  <g transform="translate(40, 40)">
+    <rect x="0" y="0" width="1200" height="720" rx="12" ry="12" fill="#0d0b20" stroke="#312e81" stroke-width="1"/>
+    <rect x="0" y="0" width="1200" height="36" rx="12" ry="12" fill="#1e1b4b"/>
+    <rect x="0" y="24" width="1200" height="12" fill="#1e1b4b"/>
+    <circle cx="20" cy="18" r="6" fill="#ef4444"/>
+    <circle cx="42" cy="18" r="6" fill="#eab308"/>
+    <circle cx="64" cy="18" r="6" fill="#22c55e"/>
+    <text x="600" y="23" font-family="Menlo, monospace" font-size="13" fill="#a5b4fc" text-anchor="middle">ensembra --- /ensembra:config --- Reuse-First Policy (Custom)</text>
+
+    <g font-family="Menlo, 'SF Mono', Consolas, monospace" font-size="16">
+      <text x="24" y="72" fill="#a5b4fc">$</text>
+      <text x="44" y="72" fill="#fef3c7">/ensembra:config</text>
+      <text x="24" y="94" fill="#a5b4fc">...navigating: 9) Reuse-First Policy  --&gt;  0) Custom</text>
+
+      <text x="24" y="136" fill="#f59e0b" font-weight="700">Ensembra &gt; Reuse-First Policy &gt; Custom</text>
+      <text x="24" y="158" fill="#312e81">-----------------------------------------------------------</text>
+
+      <text x="24" y="194" fill="#eab308">⚡</text>
+      <text x="46" y="194" fill="#eab308">Cascade applied:</text>
+      <text x="46" y="216" fill="#a5b4fc">  - device 2 (Schema Field) turned OFF</text>
+      <text x="46" y="238" fill="#a5b4fc">  - device 3 (Auto Disagree) auto-OFF (depends on 2)</text>
+      <text x="46" y="260" fill="#a5b4fc">  - device 4 (Synthesis Report) auto-OFF (depends on 2)</text>
+
+      <text x="24" y="310" fill="#c7d2fe">  [</text>
+      <text x="44" y="310" fill="#22c55e" font-weight="700">x</text>
+      <text x="58" y="310" fill="#c7d2fe">] 1) Deep Scan Inventory</text>
+      <text x="340" y="310" fill="#a5b4fc" font-size="13">(collects commons/, lib/, utils/)</text>
+
+      <text x="24" y="336" fill="#c7d2fe">  [</text>
+      <text x="44" y="336" fill="#6b7280"> </text>
+      <text x="58" y="336" fill="#c7d2fe">] 2) Schema Field (reuse_analysis)</text>
+      <text x="386" y="336" fill="#a5b4fc" font-size="13">(enforces decision + justification)</text>
+
+      <text x="24" y="362" fill="#c7d2fe">  [</text>
+      <text x="44" y="362" fill="#6b7280"> </text>
+      <text x="58" y="362" fill="#c7d2fe">] 3) Auto Disagree</text>
+      <text x="258" y="362" fill="#a5b4fc" font-size="13">(R2 auto-vote on weak justifications)</text>
+
+      <text x="24" y="388" fill="#c7d2fe">  [</text>
+      <text x="44" y="388" fill="#6b7280"> </text>
+      <text x="58" y="388" fill="#c7d2fe">] 4) Synthesis Report</text>
+      <text x="282" y="388" fill="#a5b4fc" font-size="13">(top-level reuse opportunity section)</text>
+
+      <text x="24" y="438" fill="#c7d2fe">  quick_preset match: </text>
+      <text x="226" y="438" fill="#f59e0b" font-weight="700">Advisory</text>
+      <text x="312" y="438" fill="#c7d2fe"> (1 only)</text>
+
+      <text x="24" y="478" fill="#312e81">-----------------------------------------------------------</text>
+      <text x="24" y="502" fill="#a5b4fc">  1..4 toggle  |  u undo  |  9 save  |  0 cancel</text>
+
+      <text x="24" y="552" fill="#a5b4fc">&gt;</text>
+      <text x="44" y="552" fill="#fef3c7">u</text>
+
+      <text x="24" y="590" fill="#22c55e">⚡ Undo: devices 2, 3, 4 restored.</text>
+      <text x="24" y="612" fill="#c7d2fe">Current state: </text>
+      <text x="144" y="612" fill="#22c55e" font-weight="700">Maximum (4/4)</text>
+
+      <text x="24" y="656" fill="#a5b4fc">&gt;</text>
+      <text x="44" y="656" fill="#22c55e">▌</text>
+    </g>
+  </g>
+</svg>

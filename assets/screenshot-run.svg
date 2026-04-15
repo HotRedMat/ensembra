@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 800" width="1280" height="800">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b"/>
+      <stop offset="100%" stop-color="#0f0d2e"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="800" fill="url(#bg)"/>
+
+  <g transform="translate(40, 40)">
+    <rect x="0" y="0" width="1200" height="720" rx="12" ry="12" fill="#0d0b20" stroke="#312e81" stroke-width="1"/>
+    <rect x="0" y="0" width="1200" height="36" rx="12" ry="12" fill="#1e1b4b"/>
+    <rect x="0" y="24" width="1200" height="12" fill="#1e1b4b"/>
+    <circle cx="20" cy="18" r="6" fill="#ef4444"/>
+    <circle cx="42" cy="18" r="6" fill="#eab308"/>
+    <circle cx="64" cy="18" r="6" fill="#22c55e"/>
+    <text x="600" y="23" font-family="Menlo, monospace" font-size="13" fill="#a5b4fc" text-anchor="middle">ensembra --- /ensembra:run feature</text>
+
+    <g font-family="Menlo, 'SF Mono', Consolas, monospace" font-size="16">
+      <text x="24" y="72" fill="#a5b4fc">$</text>
+      <text x="44" y="72" fill="#fef3c7">claude --plugin-dir ./ensembra --permission-mode acceptEdits \</text>
+      <text x="44" y="94" fill="#fef3c7">  --print "/ensembra:run feature Add multiply + test"</text>
+
+      <text x="24" y="136" fill="#f59e0b" font-weight="700">## Ensembra Run --- feature</text>
+
+      <text x="24" y="172" fill="#c7d2fe">Result      : </text>
+      <text x="144" y="172" fill="#22c55e" font-weight="700">Pass (Audit cleared)</text>
+      <text x="24" y="194" fill="#c7d2fe">Consensus   : </text>
+      <text x="144" y="194" fill="#fef3c7">100%</text>
+      <text x="24" y="216" fill="#c7d2fe">Rework      : </text>
+      <text x="144" y="216" fill="#fef3c7">0</text>
+      <text x="24" y="238" fill="#c7d2fe">Performers  : </text>
+      <text x="144" y="238" fill="#fef3c7">6/6 agreed</text>
+
+      <text x="24" y="280" fill="#f59e0b" font-weight="600">### Changed files</text>
+      <text x="24" y="306" fill="#c7d2fe">- src/calculator.js (+4 -1)        multiply(a,b) + exports</text>
+      <text x="24" y="328" fill="#c7d2fe">- tests/calculator.test.js (+2 -1) import + one assert</text>
+
+      <text x="24" y="370" fill="#f59e0b" font-weight="600">### Reuse-First evaluation</text>
+      <text x="24" y="396" fill="#a5b4fc">Existing function pattern, module.exports, console.assert style</text>
+      <text x="24" y="418" fill="#a5b4fc">reused </text>
+      <text x="94" y="418" fill="#22c55e" font-weight="700">100%</text>
+      <text x="140" y="418" fill="#a5b4fc">. No new files, modules, or dependencies.</text>
+
+      <text x="24" y="460" fill="#f59e0b" font-weight="600">### Audit findings (non-blocking)</text>
+      <text x="24" y="486" fill="#c7d2fe">1. </text>
+      <text x="44" y="486" fill="#eab308">[Medium]</text>
+      <text x="124" y="486" fill="#c7d2fe"> Add package.json test script</text>
+      <text x="24" y="508" fill="#c7d2fe">2. </text>
+      <text x="44" y="508" fill="#60a5fa">[Low]</text>
+      <text x="98" y="508" fill="#c7d2fe"> Consider migrating to node:assert</text>
+
+      <text x="24" y="560" fill="#f59e0b" font-weight="600">### Documents written</text>
+      <text x="24" y="586" fill="#c7d2fe">- docs/reports/tasks/2026-04-15-add-multiply.md</text>
+
+      <text x="24" y="632" fill="#a5b4fc">$</text>
+      <text x="44" y="632" fill="#fef3c7">node tests/calculator.test.js</text>
+      <text x="24" y="658" fill="#22c55e">all tests passed</text>
+
+      <text x="24" y="696" fill="#a5b4fc">$</text>
+      <text x="44" y="696" fill="#22c55e">▌</text>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 800" width="1280" height="800">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b"/>
+      <stop offset="100%" stop-color="#0f0d2e"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="800" fill="url(#bg)"/>
+
+  <g transform="translate(40, 40)">
+    <rect x="0" y="0" width="1200" height="720" rx="12" ry="12" fill="#0d0b20" stroke="#312e81" stroke-width="1"/>
+    <rect x="0" y="0" width="1200" height="36" rx="12" ry="12" fill="#1e1b4b"/>
+    <rect x="0" y="24" width="1200" height="12" fill="#1e1b4b"/>
+    <circle cx="20" cy="18" r="6" fill="#ef4444"/>
+    <circle cx="42" cy="18" r="6" fill="#eab308"/>
+    <circle cx="64" cy="18" r="6" fill="#22c55e"/>
+    <text x="600" y="23" font-family="Menlo, monospace" font-size="13" fill="#a5b4fc" text-anchor="middle">ensembra --- /ensembra:transfer</text>
+
+    <g font-family="Menlo, 'SF Mono', Consolas, monospace" font-size="15">
+      <text x="24" y="72" fill="#a5b4fc">$</text>
+      <text x="44" y="72" fill="#fef3c7">claude --plugin-dir ./ensembra --permission-mode acceptEdits \</text>
+      <text x="44" y="92" fill="#fef3c7">  --print "/ensembra:transfer"</text>
+
+      <text x="24" y="132" fill="#a5b4fc">Wide Scan (full repo) ........................... </text>
+      <text x="490" y="132" fill="#22c55e">done (42s)</text>
+      <text x="24" y="154" fill="#a5b4fc">R1 section assignment (6 performers parallel) ... </text>
+      <text x="490" y="154" fill="#22c55e">done (96s)</text>
+      <text x="24" y="176" fill="#a5b4fc">Phase 4 scribe compilation ...................... </text>
+      <text x="490" y="176" fill="#22c55e">done (18s)</text>
+
+      <text x="24" y="218" fill="#f59e0b" font-weight="700">✓ docs/transfer/2026-04-15-project.md (528 lines)</text>
+
+      <text x="24" y="260" fill="#f59e0b" font-weight="600">## Table of Contents</text>
+      <text x="24" y="286" fill="#c7d2fe">  0. Summary (scribe, 3-5 lines)</text>
+      <text x="24" y="308" fill="#c7d2fe">  1. Purpose and Goals (planner)</text>
+      <text x="24" y="330" fill="#c7d2fe">  2. Architecture (architect)</text>
+      <text x="24" y="352" fill="#c7d2fe">  3. Build, Run, Dev Env (developer)</text>
+      <text x="24" y="374" fill="#c7d2fe">  4. Security, Secrets, Accounts (security)</text>
+      <text x="24" y="396" fill="#c7d2fe">  5. Test Coverage (qa)</text>
+      <text x="24" y="418" fill="#eab308" font-weight="600">  6. ⚠ Pitfalls and Warnings (devils-advocate)</text>
+      <text x="24" y="440" fill="#c7d2fe">  7. Recent Changes (scribe)</text>
+      <text x="24" y="462" fill="#c7d2fe">  8. Open Issues and Next Steps (scribe)</text>
+      <text x="24" y="484" fill="#c7d2fe">  9. Reference Documents (scribe)</text>
+      <text x="24" y="506" fill="#c7d2fe"> 10. Appendix: Dependency Snapshot (scribe)</text>
+
+      <text x="24" y="548" fill="#f59e0b" font-weight="600">### 6. ⚠ Pitfalls and Warnings (devils-advocate excerpt)</text>
+      <text x="24" y="574" fill="#a5b4fc">  - 7 agents x 5 phases can be overkill for trivial changes</text>
+      <text x="24" y="596" fill="#a5b4fc">  - Ollama 8B models may miss JS type-coercion edge cases</text>
+      <text x="24" y="618" fill="#a5b4fc">  - 70% consensus is a heuristic, not backed by production data</text>
+      <text x="24" y="640" fill="#a5b4fc">  - Gemini free tier quota can exhaust on high-round runs</text>
+      <text x="24" y="662" fill="#a5b4fc">  - scribe is a recorder, not a critic --- do not expect opinions</text>
+
+      <text x="24" y="700" fill="#a5b4fc">$</text>
+      <text x="44" y="700" fill="#22c55e">▌</text>
+    </g>
+  </g>
+</svg>

@@ -75,4 +75,42 @@ No proprietary fonts, stock photos with restrictive licenses, or AI-generated im
 
 ## Status
 
-**Not yet created.** Marketplace submission will wait for at least `icon-128.png`, `icon-256.png`, and one screenshot.
+**Current.** All assets generated programmatically from SVG sources and committed.
+
+| File | Status | Size |
+|---|---|---|
+| `icon.svg` | ✓ source | 2.3 KB |
+| `icon-16.png` | ✓ generated | ~1 KB |
+| `icon-32.png` | ✓ generated | ~2 KB |
+| `icon-48.png` | ✓ generated | ~4 KB |
+| `icon-64.png` | ✓ generated | ~6 KB |
+| `icon-128.png` | ✓ generated | ~18 KB |
+| `icon-256.png` | ✓ generated | ~50 KB |
+| `icon-512.png` | ✓ generated | ~130 KB |
+| `social-preview.svg` | ✓ source | 3.8 KB |
+| `social-preview.png` | ✓ generated (1280×640) | ~140 KB |
+| `screenshot-run.svg` | ✓ source | — |
+| `screenshot-run.png` | ✓ generated (1280×800) | — |
+| `screenshot-config.svg` | ✓ source | — |
+| `screenshot-config.png` | ✓ generated (1280×800) | — |
+| `screenshot-transfer.svg` | ✓ source | — |
+| `screenshot-transfer.png` | ✓ generated (1280×800) | — |
+
+### Regenerating PNGs from SVG
+
+```bash
+python3 -m venv /tmp/venv
+/tmp/venv/bin/pip install cairosvg
+/tmp/venv/bin/python3 -c "
+import cairosvg
+for size in [16, 32, 48, 64, 128, 256, 512]:
+    cairosvg.svg2png(url='assets/icon.svg', write_to=f'assets/icon-{size}.png', output_width=size, output_height=size)
+cairosvg.svg2png(url='assets/social-preview.svg', write_to='assets/social-preview.png', output_width=1280, output_height=640)
+for name in ['run', 'config', 'transfer']:
+    cairosvg.svg2png(url=f'assets/screenshot-{name}.svg', write_to=f'assets/screenshot-{name}.png', output_width=1280, output_height=800)
+"
+```
+
+### Font note
+
+Screenshots use English text only. Korean glyphs in original Ensembra output are translated to English for international readability and to avoid tofu rendering issues during SVG rasterization with systems that lack Korean fonts. The actual tool output retains Korean per the design.
