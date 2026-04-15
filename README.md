@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/HotRedMat/ensembra/releases"><img src="https://img.shields.io/badge/version-0.5.0-blue" alt="version"/></a>
+  <a href="https://github.com/HotRedMat/ensembra/releases"><img src="https://img.shields.io/badge/version-0.5.1-blue" alt="version"/></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="license"/></a>
   <img src="https://img.shields.io/badge/plugin%20validate-passing-brightgreen" alt="plugin validate"/>
   <img src="https://img.shields.io/badge/verification-end--to--end-brightgreen" alt="verification"/>
@@ -113,7 +113,9 @@ ollama pull qwen2.5:14b llama3.1:8b
 
 ### Gemini setup (optional, for architect)
 
-Ensembra v0.5.0 uses Claude Code's native `userConfig` with `sensitive: true`. The key is stored in your OS keychain and accessed via `${user_config.gemini_api_key}` template substitution in the plugin's skills and agents. No workaround paths, no plaintext files.
+Ensembra v0.5.1 stores the Gemini key under `~/.claude/settings.json` (plaintext in the user's home directory, same convention as AWS CLI, gcloud, git credentials, and netrc). This is a deliberate trade-off: Claude Code blocks `sensitive: true` values from being substituted into skill/agent content, so Ensembra's architect Performer cannot reach a keychain-stored value when dispatching a Gemini call from a skill.
+
+The storage path is `~/.claude/settings.json` → `pluginConfigs.ensembra@ensembra.options.gemini_api_key`. File permission is 0600 (user only). Skills and agents access it via `${user_config.gemini_api_key}` template substitution.
 
 Set the key via the Claude Code plugin UI:
 
@@ -125,7 +127,7 @@ Then:
 1. Move the cursor down to `ensembra`
 2. Press **Enter** to open the plugin detail view
 3. Select **"Configure options"**
-4. Enter the key in the `gemini_api_key` field — it's declared `sensitive: true` so input is masked and the value is saved to your OS keychain (macOS Keychain, or `~/.claude/.credentials.json` on other platforms), never to `settings.json`
+4. Enter the key in the `gemini_api_key` field. Input is **visible** (no masking) because the field is declared `sensitive: false`. Make sure nobody is looking over your shoulder.
 5. Save
 6. `/reload-plugins`
 
@@ -133,7 +135,11 @@ Then:
 
 **Leave it unset if you don't want Gemini** — the architect performer falls back to a Claude sub-agent automatically. Ensembra works fully without a key.
 
-**Storage**: Claude Code uses the OS-native secret store. On macOS that's Keychain; on Linux it's Secret Service (gnome-keyring / kwallet) or `~/.claude/.credentials.json`. The plaintext key never touches any file you would accidentally share.
+**Security notes**:
+- The key is stored plaintext in `~/.claude/settings.json`, readable only by your user account (`chmod 0600`)
+- Do not share `~/.claude/settings.json` with anyone — rotate the key at https://aistudio.google.com/app/apikey if you do
+- Gemini free-tier keys have no billing impact and can be rotated instantly
+- For an explanation of why Ensembra uses `sensitive: false` instead of `sensitive: true`, see [`SECURITY.md`](./SECURITY.md)
 
 **Get a free API key** at <https://aistudio.google.com/app/apikey>. Default model is `gemini-2.5-flash`.
 

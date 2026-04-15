@@ -2,53 +2,90 @@
 
 ## 시크릿 취급 정책 (Q5, Q7 결정 반영)
 
-Ensembra 의 유일한 시크릿은 Gemini API 키다. **순수 Claude Code userConfig + OS 키체인 단일 경로** (v0.5.0+).
+Ensembra 의 유일한 시크릿은 Gemini API 키다. **`~/.claude/settings.json` 내 평문 저장** (v0.5.1+). Unix 홈 디렉토리 관례(AWS/gcloud/git credentials 등과 동일).
 
-## Gemini API 키 저장 (v0.5.0+)
+## Gemini API 키 저장 (v0.5.1+)
 
-**저장 메커니즘**: Claude Code 플러그인 `userConfig.gemini_api_key` (`type: "string"`, `sensitive: true`)
+**왜 평문인가** — Claude Code 2.1.109 바이너리 리버싱으로 확인된 규격:
 
-**실제 저장 위치** (Claude Code 가 자동 선택):
-- **macOS**: Keychain
-- **Windows**: Credential Manager
-- **Linux**: Secret Service (gnome-keyring / kwallet) 또는 `~/.claude/.credentials.json`
+> "Available as `${user_config.KEY}` in MCP/LSP server config, hook commands, **and (non-sensitive only) skill/agent content**."
 
-**암호화**: OS 레벨 (디스크 암호화 + 프로세스 ACL + 키체인 unlock)
+즉 `sensitive: true` 로 선언하면 OS 키체인에 저장되지만 **skill/agent content 에서는 placeholder 로 차단** 된다 (`[sensitive option 'gemini_api_key' not available in skill content]`). Ensembra 의 architect Performer 는 skill 에서 curl 로 Gemini 를 호출하는 구조라 **sensitive 필드와 근본적으로 호환 불가**. 따라서 v0.5.1 부터는 `sensitive: false` 로 선언하여 `${user_config.gemini_api_key}` 치환이 skill/agent content 에서 정상 작동하도록 한다.
 
-**설정 방법** (단일 경로):
+**저장 위치**: `~/.claude/settings.json`
+```json
+{
+  "pluginConfigs": {
+    "ensembra@ensembra": {
+      "options": {
+        "gemini_api_key": "AIza...",
+        "ollama_endpoint": "http://localhost:11434"
+      }
+    }
+  }
+}
+```
+
+**파일 권한**: Claude Code 가 이 파일을 `0600` 으로 유지한다 (사용자만 읽기/쓰기). 다른 사용자 계정에서 접근 불가.
+
+**설정 방법**:
 1. Claude Code 에서 `/plugin` 실행
 2. ↓ 로 `ensembra` 선택
 3. Enter (상세 화면 진입)
 4. "Configure options" 서브메뉴 선택 → Enter
-5. dialog 에 `gemini_api_key` 입력 (sensitive 이므로 입력이 화면에 표시 안 됨)
-6. Save
-7. `/reload-plugins`
+5. dialog 에 `gemini_api_key` 입력
+   - **⚠ 비시크릿 필드이므로 입력이 화면에 표시됨** (sensitive masking 없음)
+   - 뒤에서 엿보는 사람이 없는지 확인
+6. `ollama_endpoint` 는 기본값 유지 또는 조정
+7. Save
+8. `/reload-plugins`
 
-**참조 방법** (스킬·에이전트·훅):
-- `${user_config.gemini_api_key}` 템플릿 치환 (스킬·에이전트·MCP/LSP configs·훅 commands)
-- 훅 subprocess 에서는 `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` 환경변수도 접근 가능
+**참조 방법** (스킬·에이전트):
+- `${user_config.gemini_api_key}` 템플릿 치환 — Claude Code 가 load-time 에 실제 값으로 치환
 
 **키 없음 처리**: architect Performer 는 Claude 서브에이전트로 자동 폴백. Ensembra 는 Gemini 없이도 완전히 작동.
 
-## 제거된 경로 (v0.5.0)
+## 위협 모델 (v0.5.1)
 
-다음 경로들은 v0.3.x~v0.4.x 에서 Claude Code 오해에 기반한 워크어라운드였음. 바이너리 리버싱으로 Claude Code 의 실제 규격을 확인 후 v0.5.0 에서 모두 제거:
+**보호**:
+- 같은 사용자 이외의 계정에서 파일 접근 불가 (`chmod 0600`)
+- 레포·git 에 커밋되지 않음 (`~/.claude/` 는 사용자 홈 디렉토리)
+- Claude Code 출력·Task Report·transfer doc 에 키 값 유출 방지 (마스킹 규칙)
+
+**완화되지 않는 위험**:
+- 사용자가 `settings.json` 을 의도적으로 공유하면 유출 (예: 지원 요청에 첨부)
+- 홈 디렉토리 전체 백업 (Time Machine / iCloud Documents) 시 백업에 포함
+- Claude Code 대화 히스토리 (`~/.claude/history.jsonl`) 에 사용자가 키를 붙여넣으면 그쪽에도 기록
+- 같은 사용자 권한으로 실행되는 다른 프로세스는 파일 읽기 가능 (Unix 관례)
+
+**완화 권장**:
+- 지원·디버깅 시 `settings.json` 을 원문 공유하지 말고 `gemini_api_key` 를 수동 마스킹 후 공유
+- 주기적 키 로테이션 (3~6개월)
+- 공용 머신·공유 계정 사용 시 키 설정 금지 (architect 는 Claude 폴백으로 사용)
+
+## 왜 sensitive 를 포기했는가 — 기술적 제약
+
+v0.5.0 에서 `sensitive: true` 로 복귀 시도 후 실제 테스트에서 Claude Code 가 skill 본문의 `${user_config.gemini_api_key}` 를 `[sensitive option 'gemini_api_key' not available in skill content]` placeholder 로 치환함을 확인. Ensembra 의 architect 가 skill 내 Bash 도구로 curl 을 돌리는 아키텍처에서는 이 placeholder 로는 Gemini 호출 불가능.
+
+재설계 대안 (hook / MCP server 로 architect 를 이관) 은 Ensembra 의 "모든 Performer 는 agent/skill" 설계 원칙과 충돌. 따라서 v0.5.1 은 **"sensitive 포기 + Unix 홈 디렉토리 평문 관례"** 를 의식적 트레이드오프로 채택.
+
+참고: 대부분의 CLI 도구가 이미 같은 관례를 따른다:
+- `~/.aws/credentials` — AWS CLI 평문
+- `~/.config/gcloud/credentials.db` — gcloud (sqlite)
+- `~/.netrc` — curl, wget 등 (plaintext)
+- `~/.gitconfig` — git (plaintext)
+- `~/.ssh/config` — ssh (plaintext)
+
+Ensembra 의 `~/.claude/settings.json` 평문 저장은 이 관례의 연장선이다.
+
+## 제거된 경로 (v0.5.0~v0.5.1)
+
+다음 경로들은 v0.3.x~v0.4.x 의 워크어라운드였음. 모두 제거:
 - ❌ `~/.config/ensembra/env` 파일 폴백
 - ❌ `bin/ensembra-set-key` 스크립트
 - ❌ `/ensembra:config` 인터랙티브 키 입력 플로우
 - ❌ 대화창 키 붙여넣기 경로
-
-## 왜 순수 userConfig 가 정답인가
-
-Claude Code 2.1.109 바이너리 리버싱 결과:
-
-1. `sensitive: true` 필드는 **완전 구현** 되어 있음
-   - 바이너리 문자열: `"If true, masks dialog input and stores value in secure storage (keychain/credentials file) instead of settings.json"`
-2. `/plugin` UI 의 `"Configure options"` 서브메뉴가 sensitive 프롬프트를 제공
-   - 조건: `if (plugin.manifest.userConfig && Object.keys(...).length > 0)`
-3. `${user_config.KEY}` 템플릿 치환이 스킬·에이전트·hook/MCP/LSP 본문에서 정상 작동하도록 설계됨
-
-즉 **Claude Code 에 버그가 없었고**, 우리는 다만 `/plugin → ensembra → Configure options` UI 경로를 찾지 못하고 "버그" 로 오인했을 뿐. 올바른 경로만 쓰면 OS 키체인이 완벽하게 작동한다.
+- ❌ `sensitive: true` (v0.5.0 에서 시도했으나 skill content 차단으로 실패)
 
 ## 대안 Performer 는 시크릿 불필요
 

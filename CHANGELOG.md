@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-04-16
+
+### Fixed (critical — v0.5.0 was non-functional for Gemini)
+
+- **`gemini_api_key` marked `sensitive: false`**. v0.5.0 declared it `sensitive: true` and expected Claude Code to substitute `${user_config.gemini_api_key}` in skill/agent content, but actual testing revealed Claude Code intentionally blocks sensitive values from skill/agent content — substituting them with `[sensitive option 'gemini_api_key' not available in skill content]` placeholder. This is an explicit Claude Code security invariant, confirmed both empirically (the v0.5.0 config skill showed the placeholder when loaded into a real session) and by reverse-engineering the binary strings, which document the substitution policy as `"Available as ${user_config.KEY} in MCP/LSP server config, hook commands, and (non-sensitive only) skill/agent content"`. v0.5.0's architect performer could never actually reach the key.
+
+### Trade-off acknowledged
+
+v0.5.1 stores the key in `~/.claude/settings.json` under `pluginConfigs.ensembra@ensembra.options.gemini_api_key` (plaintext, `chmod 0600`). This is a conscious trade-off:
+
+- ✗ Not stored in the OS keychain
+- ✓ Actually accessible from skill/agent content (which is where the architect performer dispatches from)
+- ✓ Unix home-directory convention — AWS CLI (`~/.aws/credentials`), gcloud, git credentials, `~/.netrc`, `~/.ssh/config` all follow the same pattern
+- ✓ File permission `chmod 0600` isolates the key from other user accounts on the same machine
+- ✓ `/plugin → Configure options` UI flow remains the only supported setup path
+- ✗ Input is **no longer masked** in the `/plugin` dialog (masking was the `sensitive: true` behavior); users should enter the key with nobody looking over their shoulder
+
+### Alternative paths considered and rejected
+
+- **Keep `sensitive: true`, accept architect fallback**: loses the entire Gemini transport
+- **Rearchitect architect performer as a hook or MCP server**: hooks can access `$CLAUDE_PLUGIN_OPTION_*` env vars and MCP/LSP configs can substitute sensitive values, but this would require dropping the "all performers are agents/skills" design invariant and is a much larger refactor
+- **Hybrid (userConfig + env file fallback)**: this was the v0.3.x–v0.4.x design that the user explicitly asked to remove
+
+### Changed
+
+- `plugin.json`: `userConfig.gemini_api_key.sensitive` set to `false`; `title` and `description` updated with storage location and rotation guidance
+- `agents/architect.md`: transport section rewritten to reflect plaintext-home-dir storage
+- `SECURITY.md`: full threat model rewritten with the new storage policy, comparison to Unix CLI conventions, and explicit list of residual risks and mitigations
+- `CONTRACT.md` §8.4: rewritten for v0.5.1 `sensitive: false` design
+- `README.md`: Gemini setup section updated; input-visible warning added; pointer to SECURITY.md rationale
+- `INTERVIEW.md`: Q7 decision log extended with the v0.5.1 deliberation
+
+### Migration from v0.5.0
+
+If you configured a key in v0.5.0 via `/plugin → Configure options`, it's currently sitting in the OS keychain where Ensembra cannot read it. Re-enter it in v0.5.1:
+
+```bash
+claude plugin marketplace update ensembra
+claude plugin update ensembra@ensembra
+```
+
+Then in Claude Code:
+```
+/reload-plugins
+/plugin
+# → ↓ to ensembra → Enter → Configure options
+# → enter the key in gemini_api_key (input is now visible)
+# → Save
+/reload-plugins
+```
+
+The old keychain entry from v0.5.0 can be deleted manually with `security delete-generic-password -s "Claude Safe Storage" -a "Claude Key"` if desired (it's no longer read by Ensembra).
+
 ## [0.5.0] — 2026-04-16
 
 ### Changed — purified back to OS keychain single path
@@ -294,7 +347,8 @@ If you never set up an env file, no action needed — just `claude plugin update
 - Ensembra itself needs installation on a real project to test the full pipeline
 - Ollama and Gemini API key setup must be done manually before first use
 
-[Unreleased]: https://github.com/HotRedMat/ensembra/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/HotRedMat/ensembra/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/HotRedMat/ensembra/releases/tag/v0.5.1
 [0.5.0]: https://github.com/HotRedMat/ensembra/releases/tag/v0.5.0
 [0.4.1]: https://github.com/HotRedMat/ensembra/releases/tag/v0.4.1
 [0.4.0]: https://github.com/HotRedMat/ensembra/releases/tag/v0.4.0

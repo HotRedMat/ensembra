@@ -237,14 +237,15 @@ Performer 는 이종(heterogeneous) 이다. Conductor 는 각 Performer 의 `tra
 3. 블록이 없거나 JSON 파싱 실패 시 Performer 출력을 `status: "error"`, `_error.code: "format"` 로 마킹. §5 에러 규약에 따름.
 4. 자연어 서술은 절대 Conductor 가 재정리하지 않는다. `summary`, `arguments` 는 Performer 가 선언한 그대로 보존.
 
-### 8.4 Gemini 키 취급 (v0.5.0+ 순수 Claude Code userConfig)
+### 8.4 Gemini 키 취급 (v0.5.1+ `sensitive: false` — 의식적 타협)
 
-**배경**: v0.1.x 에서 v0.4.x 까지 파일 폴백·bin 스크립트 등 다양한 워크어라운드를 시도했으나, Claude Code 2.1.109 바이너리 리버싱으로 **sensitive userConfig 가 실제로 완전 구현되어 있음** 을 확인. v0.5.0 은 **순수 Claude Code userConfig + OS 키체인 단일 경로** 로 회귀.
+**배경**: v0.5.0 은 OS 키체인 단일 경로로 복귀했으나 실전 테스트에서 Claude Code 가 sensitive userConfig 값을 **skill/agent content 에서 의도적으로 차단** (`[sensitive option 'gemini_api_key' not available in skill content]` placeholder) 하는 것을 확인. 바이너리 문서 문자열: `"Available as ${user_config.KEY} in MCP/LSP server config, hook commands, and (non-sensitive only) skill/agent content"`. Ensembra 의 architect Performer 는 skill 내부에서 curl 로 Gemini 를 호출하므로 sensitive 필드와 근본적으로 호환 불가. v0.5.1 은 **`sensitive: false`** 로 의식적 타협.
 
 **저장**:
-- `plugin.json` 에 `userConfig.gemini_api_key` (`type: "string"`, `sensitive: true`) 선언
-- Claude Code 가 자동으로 OS 키체인 저장 (macOS Keychain / Windows Credential Manager / Linux Secret Service / `~/.claude/.credentials.json`)
-- 디스크 평문 저장 없음
+- `plugin.json` 에 `userConfig.gemini_api_key` (`type: "string"`, `sensitive: false`) 선언
+- Claude Code 가 `~/.claude/settings.json` 의 `pluginConfigs.ensembra@ensembra.options.gemini_api_key` 에 **평문 저장**
+- 파일 권한 `chmod 0600` (같은 사용자 계정만 접근)
+- **Unix 홈 디렉토리 관례 계열** — AWS `~/.aws/credentials`, gcloud, netrc, gitconfig, ssh config 등과 동일 수준 보호
 
 **설정 경로** (사용자):
 

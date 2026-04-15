@@ -11,11 +11,12 @@ tools: Read, Grep, Glob
 
 ## 기본 Transport
 - 기본: `gemini` / `gemini-2.5-flash` (공식 무료 API)
-- **API 키 저장**: Claude Code 플러그인 `userConfig.gemini_api_key` + `sensitive: true`
-  - OS 키체인에 저장 (macOS Keychain / Linux Secret Service / `.credentials.json`)
-  - 디스크 평문 저장 없음
-- **참조**: `${user_config.gemini_api_key}` 템플릿 치환 (skills, MCP/LSP configs, hook commands) 또는 hook subprocess 의 `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY`
-- **설정 경로**: `/plugin → ensembra → Enter → "Configure options"` 서브메뉴 → dialog 에 키 입력 (sensitive 이므로 입력 masking)
+- **API 키 저장** (v0.5.1+): Claude Code 플러그인 `userConfig.gemini_api_key` (`sensitive: false`) → `~/.claude/settings.json` 평문 저장
+  - 사용자 홈 디렉토리 권한 보호 (`chmod 0600`)
+  - 평문이지만 같은 사용자 계정 외 접근 불가 (Unix 관례)
+- **참조**: `${user_config.gemini_api_key}` 템플릿 치환 — skill/agent content 에서 load-time 에 실제 값으로 치환됨
+- **설정 경로**: `/plugin → ensembra → Enter → "Configure options"` 서브메뉴 → dialog 에 키 입력
+  - 비시크릿 필드이므로 **입력이 화면에 표시됨**, 뒤에서 엿보는 사람이 없는지 확인
 - **키 없음 → Claude 서브에이전트 폴백** (architect 는 `sonnet` 등으로 동작, 파이프라인 완전 작동)
 
 ## 책임

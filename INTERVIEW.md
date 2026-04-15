@@ -255,6 +255,25 @@ ensembra/
   - 메인 메뉴 8개 + 서브메뉴, 상세 `CONTRACT.md` §14
   - **근거**: Claude Code `/config` 와 동일한 UX 일관성. 1인 개발자가 플래그·JSON 문법을 외울 필요 없음. 모든 런타임 결정을 한 곳에 집중.
 
+- **2026-04-16 — v0.5.1 `sensitive: false` 타협 (skill/agent 치환 제약 실측 후)**
+  - v0.5.0 의 `sensitive: true` 설계가 실제 Claude Code 로드 시 skill 본문에서 `[sensitive option 'gemini_api_key' not available in skill content]` placeholder 로 치환되는 것을 /ensembra:config 호출로 empirical 확인
+  - 옵션 D (agent content 에선 다른 치환 정책이 있는지) 를 바이너리 strings 로 추가 검증:
+    - 바이너리 공식 문서 문자열: `"Available as ${user_config.KEY} in MCP/LSP server config, hook commands, and (non-sensitive only) skill/agent content"`
+    - **결론**: agent content 도 skill 과 동일한 제약 — sensitive 값은 치환 차단
+  - 재설계 대안 (hook / MCP server 로 architect 이관) 은 Ensembra 의 "모든 Performer 는 agent/skill" 설계 원칙과 충돌
+  - **결정**: `sensitive: false` 로 타협. `~/.claude/settings.json` 평문 저장
+  - **수용한 리스크**:
+    - 입력 시 화면 masking 없음 (어깨 너머 보기 가능)
+    - 사용자가 settings.json 을 공유하면 유출
+    - 홈 디렉토리 백업·동기화에 포함
+  - **정당화**:
+    - Unix 홈 디렉토리 관례 (AWS/gcloud/git/netrc/ssh config 와 동일 수준)
+    - `chmod 0600` 으로 같은 사용자 계정 외 접근 차단
+    - Gemini 무료 티어 — 유출 시 즉시 rotate, 과금 없음
+    - 실제로 Gemini 를 사용할 수 있는 유일한 경로 (이론적 안전성 vs 실제 작동의 트레이드오프)
+  - **근거 기록**: CHANGELOG.md [0.5.1] 섹션에 대안 별 rejection 사유 포함
+  - **Gate3 이월**: Claude Code 가 향후 skill/agent 에서 sensitive 치환을 허용하는 옵트인 필드를 제공하면 즉시 `sensitive: true` 로 복귀 검토
+
 - **2026-04-16 — v0.5.0 순수 userConfig 복귀 (모든 워크어라운드 제거)**
   - 리버싱으로 확인된 Claude Code 실제 규격을 신뢰하여 v0.3.x~v0.4.x 의 하이브리드 설계 전체를 폐기
   - **제거 대상**:
