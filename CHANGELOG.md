@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-04-16
+
+### Fixed
+
+- **`bin/ensembra-set-key` TTY detection crash**: v0.4.0's TTY guard used `[ -c /dev/tty ] && [ -r /dev/tty ] && [ -w /dev/tty ]`, which returns true in some non-interactive contexts (notably Claude Code's Bash tool) where the device entry exists but cannot actually be opened. The script then crashed with `stty: /dev/tty: Device not configured` when it tried to use the tty. v0.4.1 replaces the attribute check with an actual open test (`: </dev/tty` and `: >/dev/tty` in subshells), so non-interactive invocations now exit cleanly with code 2 and a helpful message directing the user to run the script in a real terminal. `--status` and `--verify` continue to work without a TTY and are mentioned in the error message.
+
 ## [0.4.0] — 2026-04-16
 
 ### Added
@@ -203,7 +209,8 @@ If you never set up an env file, no action needed — just `claude plugin update
 - Ensembra itself needs installation on a real project to test the full pipeline
 - Ollama and Gemini API key setup must be done manually before first use
 
-[Unreleased]: https://github.com/HotRedMat/ensembra/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/HotRedMat/ensembra/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/HotRedMat/ensembra/releases/tag/v0.4.1
 [0.4.0]: https://github.com/HotRedMat/ensembra/releases/tag/v0.4.0
 [0.3.0]: https://github.com/HotRedMat/ensembra/releases/tag/v0.3.0
 [0.2.1]: https://github.com/HotRedMat/ensembra/releases/tag/v0.2.1

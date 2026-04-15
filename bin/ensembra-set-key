@@ -129,14 +129,17 @@ clear_key() {
 }
 
 setup_interactive() {
-  # Require a TTY — we cannot read a secret from Claude Code's non-interactive Bash tool
-  if [ ! -c /dev/tty ] || [ ! -r /dev/tty ] || [ ! -w /dev/tty ]; then
+  # Require a TTY — we cannot read a secret from Claude Code's non-interactive Bash tool.
+  # Plain `[ -c /dev/tty ]` returns true in some non-interactive contexts where the
+  # device entry exists but cannot actually be opened ("Device not configured"). Test
+  # by attempting to actually open /dev/tty for read and write.
+  if ! ( : </dev/tty ) 2>/dev/null || ! ( : >/dev/tty ) 2>/dev/null; then
     cat >&2 <<MSG
 ensembra-set-key requires an interactive terminal (TTY).
 You appear to be running inside a non-interactive context (for example,
 Claude Code's Bash tool, a CI job, or a pipe).
 
-To set up the Gemini API key, open a real terminal and run:
+To set up the Gemini API key, open a real terminal window and run:
 
   ensembra-set-key
 
@@ -144,6 +147,11 @@ The script will prompt you for the key with input hidden, save it to
 ~/.config/ensembra/env with chmod 600, and verify it with a live API
 call. Nothing is written to shell history, clipboard, or any Claude
 Code conversation record.
+
+Already have a key set? These commands work from any context:
+
+  ensembra-set-key --status    # show presence, length, and preview
+  ensembra-set-key --verify    # call the Gemini API to test the key
 MSG
     return 2
   fi
