@@ -11,6 +11,9 @@ tools: Read, Grep, Glob
 
 ## 기본 Transport
 - 기본: `gemini` / `gemini-2.5-flash` (공식 무료 API)
+- API 키: Claude Code 플러그인 `userConfig.gemini_api_key` (OS 키체인 저장)
+  - 참조: `${user_config.gemini_api_key}` 또는 `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` 환경변수
+  - 사용자가 키를 설정하지 않았으면 (빈 값) 즉시 Claude 서브에이전트로 폴백
 - 폴백: Claude 본체 세션 모델 (`sonnet` 등)
 - 폴백 발생 시 Conductor 가 배지로 고지
 

@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-04-16
+
+### Changed (breaking for anyone who set up `~/.config/ensembra/env`)
+
+- **Gemini API key storage moved to the OS keychain.** The plugin now declares `userConfig.gemini_api_key` with `sensitive: true` in `plugin.json`, which Claude Code stores in macOS Keychain / Windows Credential Manager / Linux Secret Service. The previous mechanism of sourcing `~/.config/ensembra/env` is **removed**; that file is no longer read. Plaintext secret storage on disk is eliminated.
+- **Ollama endpoint moved to `userConfig.ollama_endpoint`** (non-sensitive) for consistency. Users can override the default `http://localhost:11434` at plugin install time.
+- **Key reference syntax changed**: scripts and agents that previously used `$GEMINI_API_KEY` (shell variable from env file) must now use `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` or `${user_config.gemini_api_key}`.
+
+### Migration from v0.1.x
+
+If you installed v0.1.x and set up an env file, follow these steps after updating:
+
+```bash
+# 1. Update the plugin
+claude plugin update ensembra
+
+# 2. Re-enable to trigger the userConfig prompt (Claude Code will ask for the Gemini key)
+claude plugin disable ensembra
+claude plugin enable ensembra
+
+# 3. Delete the old plaintext env file (now unused)
+rm -f ~/.config/ensembra/env
+rmdir ~/.config/ensembra 2>/dev/null || true  # only if empty
+```
+
+If you never set up an env file, no action needed — just `claude plugin update ensembra` and you'll be prompted for the key on next enable (optional; leave blank to skip Gemini).
+
+### Added
+
+- `.claude-plugin/plugin.json` gains `userConfig` section declaring `gemini_api_key` (sensitive) and `ollama_endpoint` (non-sensitive).
+- `SECURITY.md` documents the new keychain-based secret policy and extended masking keyword list (`CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY`, `user_config.gemini_api_key`).
+- `CONTRACT.md` §8.4 rewritten for v0.2.0 keychain-based Gemini key handling.
+
+### Removed
+
+- `~/.config/ensembra/env` plaintext secret file support.
+- `schemas/config.json` no longer has `transports.gemini.env_file_path`.
+
+### Security
+
+- Eliminated the disk-based plaintext storage of API keys entirely. The most common secret-leakage failure mode (sharing `config.json` or `env` for support / backing up to Dropbox) is now structurally impossible because the secret never touches any file the user can accidentally upload.
+- Masking keyword list extended to cover the new env var name.
+
+## [0.1.0] — 2026-04-15
+
 ### Fixed
 - Rename skill directories to drop redundant `ensembra-` prefix so commands resolve to `/ensembra:run`, `/ensembra:config`, `/ensembra:transfer`, `/ensembra:report` instead of the doubled `/ensembra:ensembra-run` form. Validated with `claude plugin validate` and live planner agent invocation.
 
@@ -69,5 +114,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ensembra itself needs installation on a real project to test the full pipeline
 - Ollama and Gemini API key setup must be done manually before first use
 
-[Unreleased]: https://github.com/HotRedMat/ensembra/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/HotRedMat/ensembra/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/HotRedMat/ensembra/releases/tag/v0.2.0
 [0.1.0]: https://github.com/HotRedMat/ensembra/releases/tag/v0.1.0

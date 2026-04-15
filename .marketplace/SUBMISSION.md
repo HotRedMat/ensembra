@@ -1,4 +1,4 @@
-# Marketplace Submission — Ensembra v0.1.0
+# Marketplace Submission — Ensembra v0.2.0
 
 This file contains the exact text and assets to paste into the official Claude Code plugin marketplace submission form at **https://claude.ai/settings/plugins/submit** (or the equivalent at platform.claude.com/plugins/submit).
 
@@ -21,7 +21,7 @@ https://github.com/HotRedMat/ensembra
 ## Form field: Version
 
 ```
-0.1.0
+0.2.0
 ```
 
 ## Form field: License
@@ -161,13 +161,15 @@ ollama pull qwen2.5:14b llama3.1:8b
 \`\`\`
 
 **Gemini** (for architect performer):
+
+During plugin install, Claude Code will prompt for the Gemini API key via the native `userConfig` mechanism with `sensitive: true` — the key is stored in the OS keychain (macOS Keychain / Windows Credential Manager / Linux Secret Service), never in a plaintext file.
+
 \`\`\`bash
-mkdir -p ~/.config/ensembra
-echo 'GEMINI_API_KEY=<your-key>' > ~/.config/ensembra/env
-chmod 600 ~/.config/ensembra/env
+claude plugin install ensembra
+# Prompt: "gemini_api_key (sensitive)" — paste the key, or leave blank to skip
 \`\`\`
 
-Free Gemini key at https://aistudio.google.com/app/apikey.
+Free Gemini key at https://aistudio.google.com/app/apikey. Default model: \`gemini-2.5-flash\`. Leave the prompt blank to skip Gemini — the architect performer will use a Claude sub-agent instead.
 ```
 
 ## Form field: Support / contact
@@ -195,8 +197,8 @@ https://github.com/HotRedMat/ensembra#readme
 Before clicking submit, verify:
 
 - [ ] Latest main is pushed to `HotRedMat/ensembra`
-- [ ] `v0.1.0` tag exists and points to the release commit
-- [ ] GitHub Release for `v0.1.0` is published
+- [ ] `v0.2.0` tag exists and points to the release commit
+- [ ] GitHub Release for `v0.2.0` is published
 - [ ] `claude plugin validate .` passes locally
 - [ ] `.github/workflows/plugin-validate.yml` CI run is green on main
 - [ ] All 7 PNG icons + 3 screenshots + 1 social preview are committed under `assets/`

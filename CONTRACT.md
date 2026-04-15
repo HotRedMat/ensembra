@@ -237,12 +237,20 @@ Performer 는 이종(heterogeneous) 이다. Conductor 는 각 Performer 의 `tra
 3. 블록이 없거나 JSON 파싱 실패 시 Performer 출력을 `status: "error"`, `_error.code: "format"` 로 마킹. §5 에러 규약에 따름.
 4. 자연어 서술은 절대 Conductor 가 재정리하지 않는다. `summary`, `arguments` 는 Performer 가 선언한 그대로 보존.
 
-### 8.4 Gemini 키 취급
+### 8.4 Gemini 키 취급 (v0.2.0+)
 
-- 로드: 호출 직전 `source ~/.config/ensembra/env` (사용자 홈, 레포 외부)
-- 전송: `curl` 의 `-H "x-goog-api-key: $GEMINI_API_KEY"` 헤더 또는 `?key=$GEMINI_API_KEY` 쿼리스트링
-- 로그: `x-goog-api-key`, `Authorization`, `key=` 값은 `[REDACTED]` 로 치환 후 기록
-- 커밋: 어떤 경로로도 레포에 저장 금지. `.gitignore` 는 이미 `.env` 계열 차단.
+- **저장**: Claude Code 플러그인 `userConfig.gemini_api_key` + `sensitive: true` → OS 키체인
+  - `plugin.json` 에서 선언
+  - 설치·활성화 시 Claude Code 가 대화형 프롬프트
+  - 디스크에 평문 저장 없음 (macOS Keychain / Windows Credential Manager / Linux Secret Service)
+- **로드**: 환경변수 `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` 또는 치환 `${user_config.gemini_api_key}`
+  - Claude Code 가 subprocess 실행 시 자동 주입
+- **전송**: `curl -H "x-goog-api-key: $CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY"` 또는 `?key=${user_config.gemini_api_key}`
+- **로그 마스킹**: `x-goog-api-key`, `Authorization`, `key=`, `CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY`, `user_config.gemini_api_key` 전부 `[REDACTED]`
+- **커밋**: 어떤 경로로도 레포에 저장 금지
+- **빈 값 처리**: 키가 설정되지 않았으면 architect Performer 는 Claude 서브에이전트로 폴백
+- **재입력**: `claude plugin disable ensembra && claude plugin enable ensembra` 로 userConfig 프롬프트 재출현
+- **이전 버전**: v0.1.x 에선 `~/.config/ensembra/env` 평문 파일이었음. v0.2.0 에서 제거. 이전 파일이 있으면 사용자가 수동 삭제 권장.
 
 ### 8.5 라운드 피로도 대응
 

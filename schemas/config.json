@@ -61,6 +61,7 @@
     },
     "transports": {
       "type": "object",
+      "description": "Transport settings. Gemini API key is NOT stored here — it lives in the OS keychain via the plugin userConfig.gemini_api_key mechanism (plugin.json). This config.json holds only non-sensitive transport settings.",
       "properties": {
         "ollama": {
           "type": "object",
@@ -71,7 +72,7 @@
         "gemini": {
           "type": "object",
           "properties": {
-            "env_file_path": { "type": "string", "default": "~/.config/ensembra/env" }
+            "_comment": { "type": "string", "description": "Gemini API key is managed via plugin userConfig. Do not store the key in this file." }
           }
         }
       }

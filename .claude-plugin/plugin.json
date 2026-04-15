@@ -1,6 +1,6 @@
 {
   "name": "ensembra",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Multi-agent orchestrator plugin for Claude Code — agents perform in concert through a 5-phase pipeline (Gather → Deliberate → Execute → Audit → Document) with Reuse-First cross-cutting policy.",
   "author": {
     "name": "Seungho Lee",
@@ -17,5 +17,15 @@
     "audit",
     "reuse-first",
     "handover"
-  ]
+  ],
+  "userConfig": {
+    "gemini_api_key": {
+      "description": "Google AI Studio API key for the architect performer (free tier: https://aistudio.google.com/app/apikey). Leave blank to disable Gemini — the architect will fall back to a Claude sub-agent. Stored securely in your OS keychain; never written to disk in plaintext.",
+      "sensitive": true
+    },
+    "ollama_endpoint": {
+      "description": "Ollama HTTP endpoint for the security and qa performers. Default: http://localhost:11434. Leave blank to skip Ollama — those performers will fall back to Claude sub-agents.",
+      "sensitive": false
+    }
+  }
 }

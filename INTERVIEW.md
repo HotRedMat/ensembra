@@ -59,11 +59,16 @@ Performer 호출 방식은 3종 혼용으로 확정:
 - [x] `chmod 600`, 원자적 쓰기, 스키마 버전 필드 포함, Reset 지원
 - [x] Deep Scan 체크리스트 중 1~4번은 강제 on (얕은 읽기 방지)
 
-## Q7. Gemini 키 관리 (추가)
-- [x] 저장 경로: `~/.config/ensembra/env` (레포 외부, gitignore 무관)
-- [x] 포맷: `GEMINI_API_KEY=...` 단일 키
-- [x] 로딩: Conductor 가 호출 직전 Bash 로 `source ~/.config/ensembra/env` 후 curl 실행
-- [x] 로그 마스킹: `Authorization`, `x-goog-api-key`, 쿼리스트링 `key=` 모두 `[REDACTED]`
+## Q7. Gemini 키 관리
+- **v0.1.x (deprecated)**: `~/.config/ensembra/env` 평문 파일 + `chmod 600`
+- **v0.2.0+ (current)**: Claude Code 플러그인 `userConfig.gemini_api_key` + `sensitive: true` → OS 키체인
+  - [x] 저장 위치: macOS Keychain / Windows Credential Manager / Linux Secret Service
+  - [x] 입력 시점: `claude plugin install / enable ensembra` 설치 프롬프트
+  - [x] 참조: `${user_config.gemini_api_key}` 또는 `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY`
+  - [x] 로그 마스킹: 8가지 패턴 전부 `[REDACTED]` (SECURITY.md 참조)
+  - [x] 빈 값 허용: 없으면 architect → Claude 서브에이전트 자동 폴백
+  - [x] 재입력: `claude plugin disable && claude plugin enable`
+- **근거**: 평문 파일보다 OS 레벨 암호화가 질적으로 더 안전. 사용자 UX 도 단순해짐 (설치 시 한 번 프롬프트만). 마켓플레이스 심사에 유리.
 
 ---
 
@@ -249,6 +254,14 @@ ensembra/
   - 모델뿐 아니라 프리셋·라운드·Deep Scan·Transport·타임아웃·로깅 **모든 설정**을 `/ensembra:config` 하나의 선택형 picker 로 관리
   - 메인 메뉴 8개 + 서브메뉴, 상세 `CONTRACT.md` §14
   - **근거**: Claude Code `/config` 와 동일한 UX 일관성. 1인 개발자가 플래그·JSON 문법을 외울 필요 없음. 모든 런타임 결정을 한 곳에 집중.
+
+- **2026-04-16 — v0.2.0 Gemini 키 저장 정책 전환 (Q7 재결정)**
+  - v0.1.x 의 `~/.config/ensembra/env` 평문 파일 방식 → **Claude Code userConfig + OS 키체인** 전환
+  - `plugin.json` 에 `userConfig.gemini_api_key` (`sensitive: true`) + `userConfig.ollama_endpoint` (비시크릿) 선언
+  - 스킬·에이전트 정의 전반에서 `${user_config.gemini_api_key}` / `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` 참조
+  - **근거**: OS 레벨 암호화(디스크 암호화 + 프로세스 ACL) 로 평문 저장보다 질적으로 안전. 사용자는 설치 시 한 번 프롬프트만 응답. config.json 공유·백업 시 시크릿 유출 사고 불가.
+  - **하위 호환 없음**: v0.1.x env 파일은 수동 삭제 필요. 실사용자 거의 없는 상태라 마이그레이션 비용 최소.
+  - **Gate2 상태**: v0.1.0 마켓플레이스 심사 대기 중. v0.2.0 은 심사와 무관하게 main 에 merge, 태그 v0.2.0 발행. 승인 결과에 따라 재제출 여부 결정.
 
 - **2026-04-15 — Gate1 아키텍처 2차 확정 (Q12~Q20 상당)**
   - **Performer 구성 (6명 토론 + scribe 1명)**:

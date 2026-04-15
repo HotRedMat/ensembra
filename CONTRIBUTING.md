@@ -30,7 +30,7 @@ claude --plugin-dir /path/to/ensembra
 ### Optional transport setup
 
 - **Ollama**: `ollama pull qwen2.5:14b llama3.1:8b`
-- **Gemini**: get a free key at `https://aistudio.google.com/app/apikey`, then `echo 'GEMINI_API_KEY=<key>' > ~/.config/ensembra/env && chmod 600 ~/.config/ensembra/env`
+- **Gemini**: get a free key at `https://aistudio.google.com/app/apikey`. Claude Code will prompt for it when you install or enable the plugin (`claude plugin install ensembra` or `claude plugin disable ensembra && claude plugin enable ensembra`). The key is stored in your OS keychain, not on disk.
 
 ## Making changes
 

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/HotRedMat/ensembra/releases"><img src="https://img.shields.io/badge/version-0.1.0-blue" alt="version"/></a>
+  <a href="https://github.com/HotRedMat/ensembra/releases"><img src="https://img.shields.io/badge/version-0.2.0-blue" alt="version"/></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="license"/></a>
   <img src="https://img.shields.io/badge/plugin%20validate-passing-brightgreen" alt="plugin validate"/>
   <img src="https://img.shields.io/badge/verification-end--to--end-brightgreen" alt="verification"/>
@@ -113,13 +113,28 @@ ollama pull qwen2.5:14b llama3.1:8b
 
 ### Gemini setup (optional, for architect)
 
+Ensembra uses Claude Code's native `userConfig` mechanism with `sensitive: true`, so the Gemini API key is stored in your **OS keychain** — never in a plaintext file on disk.
+
+**First-time setup** — when you install or enable the plugin, Claude Code prompts you for the key:
+
 ```bash
-mkdir -p ~/.config/ensembra
-echo 'GEMINI_API_KEY=<your-key>' > ~/.config/ensembra/env
-chmod 600 ~/.config/ensembra/env
+claude plugin install ensembra
+# Claude Code asks for gemini_api_key (paste it; input is hidden)
 ```
 
-Get a free API key at <https://aistudio.google.com/app/apikey>. Default model is `gemini-2.5-flash`.
+Or if you already installed without a key and want to add it now:
+
+```bash
+claude plugin disable ensembra
+claude plugin enable ensembra
+# The userConfig prompt reappears
+```
+
+**Get a free API key** at <https://aistudio.google.com/app/apikey>. Default model is `gemini-2.5-flash`.
+
+**Leave it blank if you don't want Gemini** — the architect performer will fall back to a Claude sub-agent automatically. No Gemini account required to use Ensembra.
+
+Stored in: macOS Keychain, Windows Credential Manager, or Linux Secret Service (gnome-keyring / kwallet). Never touches `~/.config/ensembra/` or any file you'd accidentally share.
 
 ## Reuse-First Policy
 

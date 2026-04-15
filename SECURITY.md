@@ -2,18 +2,29 @@
 
 ## 시크릿 취급 정책 (Q5, Q7 결정 반영)
 
-Ensembra 본체는 **시크릿을 보관·커밋하지 않는다**. 단 하나의 예외:
+Ensembra 본체는 **시크릿을 평문으로 보관·커밋하지 않는다**. 유일한 시크릿인 Gemini API 키는 **OS 키체인** 에 격리 저장된다.
 
-- **Gemini 공식 API 키 1종**
-  - 저장 위치: `~/.config/ensembra/env` (사용자 홈, 레포 외부)
-  - 포맷: `GEMINI_API_KEY=...`
-  - 로딩: Conductor 가 호출 직전 `source ~/.config/ensembra/env` 후 `curl` 실행. 쉘 변수는 해당 프로세스 수명 동안만 존재.
-  - 전송 헤더: `x-goog-api-key: $GEMINI_API_KEY`
-  - 파일 권한 권장: `chmod 600 ~/.config/ensembra/env`
+- **Gemini 공식 API 키 1종** (v0.2.0+ 정책)
+  - 저장 방식: Claude Code 플러그인 `userConfig.gemini_api_key` + `sensitive: true`
+  - 실제 저장 위치: OS 레벨 시크릿 저장소
+    - **macOS**: Keychain
+    - **Windows**: Credential Manager
+    - **Linux**: Secret Service (gnome-keyring / kwallet) — 불가 시 `~/.claude/.credentials.json`
+  - 암호화: OS 가 제공 (디스크 암호화 + 프로세스 ACL)
+  - 입력 시점: `claude plugin install ensembra` 또는 `claude plugin enable ensembra` 시 Claude Code 가 대화형 프롬프트
+  - 참조 방법:
+    - 스킬·에이전트 본문에서 `${user_config.gemini_api_key}` 로 치환
+    - 서브프로세스 (curl 등) 에서 `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` 환경변수
+  - 빈 값 허용: 키 없으면 architect Performer 는 Claude 서브에이전트로 자동 폴백
+  - 재입력: `claude plugin disable ensembra && claude plugin enable ensembra` 로 userConfig 프롬프트 재출현
 
-Ollama 와 Claude 서브에이전트 Performer 는 시크릿을 요구하지 않는다. ChatGPT 는 Performer 에서 제외됨 (ToS·안정성).
+- **v0.2.0 전 (deprecated)**: `~/.config/ensembra/env` 평문 파일 방식은 제거됨. 이전 버전을 사용하던 경우 해당 파일은 더 이상 읽히지 않으며 수동 삭제 권장.
 
-**관련 설정 파일** (`~/.config/ensembra/config.json`): Performer 모델 매핑을 담는다. 시크릿은 포함되지 않지만 사용자 설정 노출 방지를 위해 `chmod 600` 권장. `env` 와 같은 디렉토리를 공유하지만 파일은 분리한다.
+Ollama 와 Claude 서브에이전트 Performer 는 시크릿을 요구하지 않는다. Ollama 는 로컬 HTTP, Claude 는 세션 토큰.
+
+ChatGPT 는 Performer 에서 제외됨 (ToS·안정성).
+
+**관련 설정 파일** (`~/.config/ensembra/config.json`): Performer 모델 매핑·프리셋·라운드 등 **비시크릿** 설정만 저장. **시크릿은 이 파일에 절대 포함되지 않음**. `chmod 600` 권장 (사용자 설정 프라이버시).
 
 ## 위협 모델
 
@@ -45,7 +56,9 @@ Ensembra 가 생성하는 모든 로그·트레이스·에이전트 출력에서
 - `Authorization`
 - `x-goog-api-key` (Gemini)
 - 쿼리스트링 `key=` (Gemini 대체 인증 방식)
-- `token`, `api_key`, `apikey`, `GEMINI_API_KEY`
+- `token`, `api_key`, `apikey`
+- `GEMINI_API_KEY`, `CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY`
+- `user_config.gemini_api_key`, `${user_config.gemini_api_key}`
 - `password`, `passwd`, `secret`
 - `cookie`, `set-cookie`
 

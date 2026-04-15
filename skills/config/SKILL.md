@@ -43,7 +43,7 @@ Ensembra 설정
 ### (1) Performers
 역할 7개 나열 → 선택 → 모델 picker (Live 조회):
 - Ollama: `Bash curl -s http://localhost:11434/api/tags` → `.models[].name`
-- Gemini: `Bash curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_API_KEY"` → `.models[]` (filter: `generateContent` in `supportedGenerationMethods`)
+- Gemini: `Bash curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=${CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY}"` → `.models[]` (filter: `generateContent` in `supportedGenerationMethods`). 키가 비어있으면 Gemini 섹션 생략하고 "키 미설정 — plugin disable/enable 로 재설정 가능" 안내
 - Claude: 정적 목록 (opus/sonnet/haiku + 현재 세션 ID)
 숫자 입력으로 선택.
 
@@ -68,10 +68,13 @@ Ensembra 설정
 1~4, 9, 10 번호 입력 시: "이 항목은 강제 on 입니다" 안내만.
 
 ### (5) Transports
-- a) Ollama endpoint (기본 `http://localhost:11434`)
+- a) Ollama endpoint (기본 `http://localhost:11434`, 플러그인 userConfig.ollama_endpoint 와 연동)
 - b) Ollama health check → `curl -s /api/tags`
-- c) Gemini API 키 설정 → 값 입력 → `~/.config/ensembra/env` 에 저장 (`chmod 600`)
-- d) Gemini health check
+- c) Gemini API 키 상태 표시
+  - `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` 환경변수가 비어있지 않으면 `✓ set (OS keychain)` 표시, 값은 절대 출력 금지
+  - 비어있으면 `✗ not set` + "키 재설정은 `claude plugin disable ensembra && claude plugin enable ensembra` 로 수행 (userConfig 프롬프트 재출현)" 안내
+  - 이 스킬은 키를 직접 저장하지 않음 — Claude Code 의 OS 키체인 네이티브 메커니즘에 위임
+- d) Gemini health check → `curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=${CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY}"` 응답 200 / 에러 표시
 - e) Claude 폴백 모델 선택
 
 ### (6) Timeouts
@@ -155,6 +158,7 @@ Quick Select:
 `schemas/config.json` 의 JSON Schema 를 준수. 저장 시 스키마 검증 수행.
 
 ## 보안
-- Gemini API 키 저장 파일 `~/.config/ensembra/env` 는 **`chmod 600`** 필수
-- `config.json` 에는 시크릿 포함 금지 (키는 별도 env 파일)
-- `SECURITY.md` 마스킹 규칙 준수
+- Gemini API 키는 **OS 키체인** 에 저장됨 (Claude Code `userConfig.gemini_api_key` + `sensitive: true`). 평문 파일 저장 없음.
+- 이 스킬은 키 값을 화면에 **절대 출력하지 않음** — 설정 여부만 `✓ set / ✗ not set` 로 표시
+- `config.json` 에는 시크릿 포함 금지 (키는 OS 키체인에 격리)
+- `SECURITY.md` 마스킹 규칙 준수 — 로그·보고서에서 `x-goog-api-key`, `key=`, `GEMINI_API_KEY`, `CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` 모두 `[REDACTED]`
