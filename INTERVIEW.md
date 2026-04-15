@@ -255,6 +255,26 @@ ensembra/
   - 메인 메뉴 8개 + 서브메뉴, 상세 `CONTRACT.md` §14
   - **근거**: Claude Code `/config` 와 동일한 UX 일관성. 1인 개발자가 플래그·JSON 문법을 외울 필요 없음. 모든 런타임 결정을 한 곳에 집중.
 
+- **2026-04-16 — v0.4.0 `ensembra-set-key` 스크립트 도입 (Ensembra 자체 deliberation 결과)**
+  - Ensembra 파이프라인을 자기 자신에게 적용해서 v0.3.0 의 Gemini 키 설정 UX 결함을 분석
+  - 4 Performer (architect/security/developer/devils-advocate) R1 병렬 호출
+  - 합의 결과 (합의율 ~90%):
+    - devils-advocate: YAGNI 9/10, "아무것도 안 하는 것이 최선" — 단 꼭 개선하려면 `bin/ensembra-set-key` 만 조건부 수용
+    - security: 6개 대안 중 `bin/ensembra-set-key + /dev/tty + read -s` 만 LOW risk (최고점)
+    - developer: POSIX sh 스크립트, 크로스플랫폼, 난이도 low, 최우수
+    - architect: osascript 대안도 제시했으나 macOS 전용이라 secondary
+  - 구현: `bin/ensembra-set-key` POSIX sh 스크립트 신설
+    - `/dev/tty` 에서 echo 꺼진 입력 수신 → Claude Code Bash 도구 stdin 제약 우회
+    - atomic write (`tmp → mv`) + `chmod 600` 강제
+    - 실제 Gemini API 호출로 즉시 검증
+    - `--status` / `--verify` / `--clear` / `--help` 서브커맨드
+  - Reuse-First 평가:
+    - `~/.config/ensembra/env` 저장 경로 **재사용**
+    - `chmod 600` 정책 **재사용**
+    - 스크립트는 얇은 래퍼 — decision: extend (기존 경로 확장)
+  - **근거**: devils-advocate 의 "legacy 부채 우려" 를 정확히 회피. 기존 env 파일 경로를 그대로 쓰기 때문에 Claude Code userConfig 가 나중에 고쳐져도 이 스크립트는 부채가 되지 않음 (calendar: legacy 검토 불필요)
+  - **자가 deliberation 성공 사례 2번째**: 1번째는 v0.2.1 drift 4건 자체 발견, 2번째는 v0.4.0 UX 개선 자체 설계. Ensembra 가 실전 설계 의사결정에 쓸 수 있음을 입증.
+
 - **2026-04-16 — v0.3.0 하이브리드 키 저장 (Claude Code 2.x 버그 워크어라운드)**
   - v0.2.x 의 "순수 userConfig + OS 키체인" 설계가 Claude Code 2.1.109 에서 실제로 작동하지 않는 것 확인
     - `claude plugin install` 이 sensitive 필드 프롬프트를 띄우지 못함

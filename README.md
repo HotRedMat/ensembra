@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/HotRedMat/ensembra/releases"><img src="https://img.shields.io/badge/version-0.3.0-blue" alt="version"/></a>
+  <a href="https://github.com/HotRedMat/ensembra/releases"><img src="https://img.shields.io/badge/version-0.4.0-blue" alt="version"/></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="license"/></a>
   <img src="https://img.shields.io/badge/plugin%20validate-passing-brightgreen" alt="plugin validate"/>
   <img src="https://img.shields.io/badge/verification-end--to--end-brightgreen" alt="verification"/>
@@ -121,28 +121,34 @@ Ensembra v0.3.0 uses a **hybrid key lookup chain** for maximum compatibility:
 
 **Why two paths?** Claude Code 2.1.109's plugin install flow currently cannot prompt for `sensitive: true` userConfig values. Ensembra declares the `userConfig` field anyway (forward-compatible) and additionally supports a plain env file as a workaround until Claude Code is fixed.
 
-#### Recommended: in-session setup via `/ensembra:config`
+#### Recommended: `ensembra-set-key` (v0.4.0+)
 
-Inside Claude Code, run:
-
-```
-/ensembra:config
-→ 5) Transports
-→ c) Gemini API key
-```
-
-The skill walks you through key entry, writes `~/.config/ensembra/env` with `chmod 600`, and verifies the key with a real API call. No terminal editing required.
-
-> ⚠ Any key you paste into the Claude Code conversation is logged in `~/.claude/history.jsonl`. Rotate the key after testing if you consider the history sensitive.
-
-#### Alternative: terminal one-liner
+Ensembra ships a `bin/ensembra-set-key` script that's added to your `$PATH` automatically when the plugin is enabled. Open any terminal and run:
 
 ```bash
-mkdir -p ~/.config/ensembra
-read -s -p "Gemini API key: " K && echo "GEMINI_API_KEY=$K" > ~/.config/ensembra/env && chmod 600 ~/.config/ensembra/env && unset K
+ensembra-set-key
 ```
 
-The `read -s` hides the input and the key is never in shell history.
+The script will:
+
+1. Prompt for your Gemini API key with **input hidden** (echo off, reading from `/dev/tty`)
+2. Save it to `~/.config/ensembra/env` atomically with `chmod 600`
+3. Verify the key with a live Gemini API call
+4. Print success/failure — **the key value is never echoed, logged, or sent to any Claude Code conversation record**
+
+Additional commands:
+```bash
+ensembra-set-key --status   # show current key state (length + preview only)
+ensembra-set-key --verify   # test saved key against the API
+ensembra-set-key --clear    # delete the saved key
+ensembra-set-key --help     # full usage
+```
+
+**Why a separate script?** Claude Code's Bash tool runs as a non-interactive subprocess — it can't forward your terminal's stdin. The `ensembra-set-key` script directly opens `/dev/tty` on its own, so the secret never passes through the Claude Code conversation, shell history, clipboard, or any log. This is the most secure path available in 2026-04.
+
+**Get a free API key** at <https://aistudio.google.com/app/apikey>. Default model is `gemini-2.5-flash`.
+
+**Leave it unset if you don't want Gemini** — the architect performer falls back to a Claude sub-agent automatically.
 
 **Get a free API key** at <https://aistudio.google.com/app/apikey>. Default model is `gemini-2.5-flash`.
 

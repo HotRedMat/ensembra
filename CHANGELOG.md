@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-04-16
+
+### Added
+
+- **`bin/ensembra-set-key`** — a POSIX sh script (0755) that ships with the plugin. When the plugin is enabled, Claude Code adds `bin/` to the user's `$PATH`, so users can run `ensembra-set-key` from any terminal:
+  - Prompts with echo disabled (`stty -echo` + `read` from `/dev/tty`)
+  - Saves the key atomically to `~/.config/ensembra/env` with `chmod 600`
+  - Verifies with a live Gemini API call (`/v1beta/models`)
+  - **The key value is never echoed, logged, or sent to any Claude Code conversation, shell history, or clipboard.**
+  - Subcommands: `--status` (state without value), `--verify` (test saved key), `--clear` (delete key), `--help`
+  - POSIX sh, cross-platform (macOS, Linux, WSL, Git Bash)
+
+### Changed
+
+- **Gemini key setup flow switched from "paste into Claude Code chat" to `ensembra-set-key`.** Pasting keys into the Claude Code conversation is no longer the recommended path because the conversation is logged in `~/.claude/history.jsonl`. `ensembra-set-key` solves this by reading from `/dev/tty` directly, completely bypassing the chat transcript.
+- `skills/config/SKILL.md` Transports (5)c rewritten — the skill no longer attempts to read the key from the chat. Instead it prints a one-liner instruction to run `ensembra-set-key` in any terminal.
+- `README.md`, `examples/quickstart.md`, `CONTRIBUTING.md`: updated to document the new script-based flow.
+- `CONTRACT.md` §8.4: extended to describe the `ensembra-set-key` tool as the canonical user-facing entry point while keeping the env-var / env-file lookup chain unchanged.
+
+### Why
+
+Used Ensembra's own deliberation pipeline (`/ensembra:run` style analysis with 4 Performer roles) to evaluate 6 alternative setup flows. Consensus from architect / security / developer / devils-advocate: the bundled shell script is the only option that is (a) cross-platform, (b) keeps the secret out of every log/transcript/history, (c) doesn't create legacy debt when Claude Code eventually fixes its userConfig bug, (d) doesn't multiply user-facing options (decision fatigue).
+
+### Reuse-First evaluation
+
+- `~/.config/ensembra/env` storage path — **reused** (unchanged since v0.3.0)
+- `chmod 600` enforcement — **reused**
+- `agents/architect.md` lookup chain — **reused**
+- `ensembra-set-key` is a thin wrapper over existing paths, not a new storage backend — extends, does not create
+
+### Migration from v0.3.0
+
+No config or file changes needed. Existing `~/.config/ensembra/env` keys continue to work. New users should install the plugin and run `ensembra-set-key` once; existing users can keep their current setup or run `ensembra-set-key --status` to verify it.
+
 ## [0.3.0] — 2026-04-16
 
 ### Changed — hybrid secret storage (critical for real-world installability)
@@ -169,7 +203,8 @@ If you never set up an env file, no action needed — just `claude plugin update
 - Ensembra itself needs installation on a real project to test the full pipeline
 - Ollama and Gemini API key setup must be done manually before first use
 
-[Unreleased]: https://github.com/HotRedMat/ensembra/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/HotRedMat/ensembra/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/HotRedMat/ensembra/releases/tag/v0.4.0
 [0.3.0]: https://github.com/HotRedMat/ensembra/releases/tag/v0.3.0
 [0.2.1]: https://github.com/HotRedMat/ensembra/releases/tag/v0.2.1
 [0.2.0]: https://github.com/HotRedMat/ensembra/releases/tag/v0.2.0

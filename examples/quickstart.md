@@ -129,21 +129,13 @@ Ensembra will auto-route the security performer to `qwen2.5:14b` and the qa perf
 
 ### Gemini (free tier)
 
-Ensembra v0.3.0 uses a hybrid key lookup: it first checks the Claude Code userConfig env var, then falls back to `~/.config/ensembra/env`.
-
-**In-session** (recommended):
-```
-/ensembra:config
-→ 5) Transports
-→ c) Gemini API key
-```
-Follow the prompts. The skill writes the key to `~/.config/ensembra/env` with `chmod 600` and verifies with a live API call.
-
-**Terminal one-liner**:
+Run the bundled script in any terminal:
 ```bash
-mkdir -p ~/.config/ensembra
-read -s -p "Gemini API key: " K && echo "GEMINI_API_KEY=$K" > ~/.config/ensembra/env && chmod 600 ~/.config/ensembra/env && unset K
+ensembra-set-key
 ```
+Input is hidden, saved to `~/.config/ensembra/env` (`chmod 600`), and verified with a live Gemini API call. The key never appears in your shell history, clipboard, or Claude Code conversation record.
+
+Other commands: `ensembra-set-key --status | --verify | --clear | --help`
 
 Get a free key at <https://aistudio.google.com/app/apikey>. Default model: `gemini-2.5-flash`. Skip entirely if you don't want Gemini — architect falls back to Claude.
 

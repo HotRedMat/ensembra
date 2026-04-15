@@ -263,10 +263,14 @@ unset GEMINI_KEY GEMINI_API_KEY  # 호출 후 정리
 ```
 
 **설정 경로** (사용자 관점):
-- **권장 (v0.3.0)**: `/ensembra:config → 5) Transports → c) Gemini API key` 인터랙티브 플로우
-  - 스킬이 직접 Write 툴로 `~/.config/ensembra/env` 생성 + `chmod 600`
-  - Claude Code 세션 내부에서 완결 (터미널 이탈 불필요)
-- **대안**: 터미널에서 `mkdir -p ~/.config/ensembra && echo 'GEMINI_API_KEY=...' > ~/.config/ensembra/env && chmod 600 ~/.config/ensembra/env`
+- **권장 (v0.4.0+)**: 어떤 터미널에서든 `ensembra-set-key` 실행
+  - 플러그인의 `bin/` 디렉토리가 Claude Code 에 의해 자동 PATH 주입
+  - 스크립트가 `/dev/tty` 에서 echo 꺼진 입력을 받음 → Claude Code Bash 도구 stdin 제약 구조적 우회
+  - atomic write 로 `~/.config/ensembra/env` 생성 (`chmod 600`)
+  - 실제 Gemini API 호출로 즉시 검증
+  - **대화 히스토리·쉘 히스토리·클립보드 어디에도 키 미기록**
+  - 서브커맨드: `--status` / `--verify` / `--clear` / `--help`
+- **Deprecated (v0.3.0 방식)**: Claude Code 대화창에 키 붙여넣기 — `~/.claude/history.jsonl` 유출 위험으로 v0.4.0 이후 비권장
 
 **로그 마스킹**: `x-goog-api-key`, `Authorization`, `key=`, `CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY`, `user_config.gemini_api_key`, `GEMINI_API_KEY` 전부 `[REDACTED]`
 

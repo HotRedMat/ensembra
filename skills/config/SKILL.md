@@ -70,13 +70,46 @@ Ensembra 설정
 ### (5) Transports
 - a) Ollama endpoint (기본 `http://localhost:11434`)
 - b) Ollama health check → `curl -s /api/tags`
-- c) **Gemini API key — 인터랙티브 설정 플로우** (v0.3.0+)
+- c) **Gemini API key — `ensembra-set-key` 안내** (v0.4.0+)
 - d) Gemini health check
 - e) Claude 폴백 모델 선택
 
-#### (5)c Gemini API key 인터랙티브 플로우
+#### (5)c Gemini API key 안내
+
+v0.4.0 부터는 **사용자 터미널에서 `ensembra-set-key` 스크립트를 실행하는 것이 권장 경로** 다. Claude Code 의 Bash 툴은 비대화형이라 `read -s` 로 키를 직접 받을 수 없지만, 플러그인 `bin/` 디렉토리가 사용자 PATH 에 주입되어 있으므로 사용자가 아무 터미널에서나 `ensembra-set-key` 한 단어로 스크립트를 호출할 수 있다. 이 스크립트는 `/dev/tty` 에서 echo 꺼진 상태로 키를 읽고, `~/.config/ensembra/env` 에 `chmod 600` 으로 저장한 뒤, 실제 Gemini API 호출로 검증한다. **대화 히스토리·클립보드·쉘 히스토리 어디에도 키가 남지 않는다.**
 
 Claude Code 2.1.109 의 plugin install 이 sensitive userConfig 프롬프트를 띄우지 못하는 버그를 우회하기 위해, 이 스킬이 직접 키 설정 플로우를 제공한다.
+
+**0. 스킬이 (5)c 진입 시 수행할 것** — 사용자에게 다음 안내만 출력하고 종료:
+
+```
+Ensembra 는 Gemini 키를 `ensembra-set-key` 스크립트로 설정합니다.
+
+아무 터미널에서 다음 명령을 실행하세요:
+
+  ensembra-set-key
+
+- 입력은 숨겨지며 (echo off)
+- ~/.claude/history.jsonl, 쉘 히스토리, 클립보드 어디에도 기록되지 않습니다
+- ~/.config/ensembra/env 에 chmod 600 으로 저장됩니다
+- 저장 직후 실제 Gemini API 호출로 검증합니다
+
+현재 상태 확인 (값 출력 없음):
+  ensembra-set-key --status
+
+검증만 재실행:
+  ensembra-set-key --verify
+
+키 삭제:
+  ensembra-set-key --clear
+
+키를 설정한 후 `/reload-plugins` 는 필요 없습니다 — Ensembra 가
+호출할 때마다 파일에서 읽습니다.
+```
+
+**왜 스크립트로 위임하나**: Claude Code 의 Bash 도구는 비대화형 subprocess 라 stdin 을 받을 수 없다. 반면 사용자 터미널에서 직접 실행되는 스크립트는 `/dev/tty` 를 열어 echo 꺼진 입력을 받을 수 있다. 스크립트가 성공 메시지만 stdout 에 쓰고 키 값 자체는 파일에만 저장하므로 Claude Code 가 이 스크립트를 호출해도 키는 대화 기록에 흘러 들어가지 않는다.
+
+---
 
 **1. 현재 상태 조회** — 다음 순서로 키 존재 확인:
 
