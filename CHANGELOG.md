@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-04-16
+
+### Fixed
+- **`userConfig` schema conformance**: v0.2.0 declared `userConfig.gemini_api_key` and `userConfig.ollama_endpoint` with only `description` and `sensitive` fields. Claude Code's plugin manifest validator requires `type` (enum: `string|number|boolean|directory|file`) and `title` (string) on every userConfig entry. Installing v0.2.0 produced `Failed to install plugin "ensembra": Plugin temp_local_* has an invalid manifest file`. v0.2.1 adds the missing fields (`type: "string"`, `title: "Gemini API key"` / `"Ollama endpoint"`). v0.2.0 release should not be installed; use v0.2.1.
+
 ## [0.2.0] — 2026-04-16
 
 ### Changed (breaking for anyone who set up `~/.config/ensembra/env`)
@@ -114,6 +119,7 @@ If you never set up an env file, no action needed — just `claude plugin update
 - Ensembra itself needs installation on a real project to test the full pipeline
 - Ollama and Gemini API key setup must be done manually before first use
 
-[Unreleased]: https://github.com/HotRedMat/ensembra/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/HotRedMat/ensembra/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/HotRedMat/ensembra/releases/tag/v0.2.1
 [0.2.0]: https://github.com/HotRedMat/ensembra/releases/tag/v0.2.0
 [0.1.0]: https://github.com/HotRedMat/ensembra/releases/tag/v0.1.0
