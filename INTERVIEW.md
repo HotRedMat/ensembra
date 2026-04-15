@@ -255,6 +255,19 @@ ensembra/
   - 메인 메뉴 8개 + 서브메뉴, 상세 `CONTRACT.md` §14
   - **근거**: Claude Code `/config` 와 동일한 UX 일관성. 1인 개발자가 플래그·JSON 문법을 외울 필요 없음. 모든 런타임 결정을 한 곳에 집중.
 
+- **2026-04-16 — v0.3.0 하이브리드 키 저장 (Claude Code 2.x 버그 워크어라운드)**
+  - v0.2.x 의 "순수 userConfig + OS 키체인" 설계가 Claude Code 2.1.109 에서 실제로 작동하지 않는 것 확인
+    - `claude plugin install` 이 sensitive 필드 프롬프트를 띄우지 못함
+    - `/plugin` UI 도 sensitive 필드 저장 실패 (non-sensitive 조차 env 주입 안 됨)
+    - 결과: v0.2.x 는 Gemini 키 설정 불가능
+  - v0.3.0 해결: **하이브리드 조회 체인**
+    1. `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` (userConfig, 미래 호환)
+    2. `~/.config/ensembra/env` 파일 (chmod 600, 현재 워크어라운드)
+    3. 없음 → Claude 서브에이전트 폴백
+  - **`/ensembra:config` 스킬 확장**: 5) Transports → c) Gemini API key 에서 Claude Code 세션 내부 인터랙티브 플로우 (키 입력·파일 생성·chmod·검증) 제공. 사용자 터미널 이탈 없이 완결.
+  - **근거**: 완벽한 설계(순수 키체인) 는 런타임 버그 때문에 사용자 경험이 0. 현실적 설계(하이브리드) 는 keychain 수준 보안엔 못 미치지만 지금 바로 작동. 미래 Claude Code 가 고쳐지면 자동으로 최상위 경로 작동.
+  - **Gate3 이월**: Claude Code userConfig 버그 수정 시 env 파일 경로 deprecation → v0.4.0 에서 제거 검토.
+
 - **2026-04-16 — v0.2.1 긴급 패치 (userConfig 스키마)**
   - v0.2.0 릴리스 직후 로컬 설치 시도에서 `Failed to install plugin "ensembra": invalid manifest file` 에러 발생
   - 원인: Gate1 STEP 0 에서 참조한 공식 문서 예시가 `userConfig` 엔트리의 **간략형** 만 제시 (`description` + `sensitive`). 실제 validator 는 `type` (enum: string/number/boolean/directory/file) 과 `title` (string) 을 **추가 필수** 로 요구

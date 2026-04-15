@@ -129,21 +129,23 @@ Ensembra will auto-route the security performer to `qwen2.5:14b` and the qa perf
 
 ### Gemini (free tier)
 
-Claude Code prompts you for the Gemini key when the plugin is installed or enabled — no manual file editing needed.
+Ensembra v0.3.0 uses a hybrid key lookup: it first checks the Claude Code userConfig env var, then falls back to `~/.config/ensembra/env`.
 
+**In-session** (recommended):
+```
+/ensembra:config
+→ 5) Transports
+→ c) Gemini API key
+```
+Follow the prompts. The skill writes the key to `~/.config/ensembra/env` with `chmod 600` and verifies with a live API call.
+
+**Terminal one-liner**:
 ```bash
-claude plugin install ensembra
-# Claude Code asks for gemini_api_key (input hidden, stored in OS keychain)
+mkdir -p ~/.config/ensembra
+read -s -p "Gemini API key: " K && echo "GEMINI_API_KEY=$K" > ~/.config/ensembra/env && chmod 600 ~/.config/ensembra/env && unset K
 ```
 
-Already installed without a key? Re-trigger the prompt:
-
-```bash
-claude plugin disable ensembra
-claude plugin enable ensembra
-```
-
-Get a free key at <https://aistudio.google.com/app/apikey>. The architect performer will route to `gemini-2.5-flash` when the key is set; otherwise it falls back to a Claude sub-agent.
+Get a free key at <https://aistudio.google.com/app/apikey>. Default model: `gemini-2.5-flash`. Skip entirely if you don't want Gemini — architect falls back to Claude.
 
 ## What's next
 

@@ -11,11 +11,13 @@ tools: Read, Grep, Glob
 
 ## 기본 Transport
 - 기본: `gemini` / `gemini-2.5-flash` (공식 무료 API)
-- API 키: Claude Code 플러그인 `userConfig.gemini_api_key` (OS 키체인 저장)
-  - 참조: `${user_config.gemini_api_key}` 또는 `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` 환경변수
-  - 사용자가 키를 설정하지 않았으면 (빈 값) 즉시 Claude 서브에이전트로 폴백
+- **API 키 하이브리드 조회 체인** (v0.3.0+):
+  1. `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` 환경변수 — Claude Code `userConfig` 에서 주입 (미래 Claude Code 버전에서 제대로 작동 시)
+  2. `~/.config/ensembra/env` 파일의 `GEMINI_API_KEY=...` — Claude Code 2.x userConfig 버그 워크어라운드 (`chmod 600` 강제)
+  3. 둘 다 없음 → 즉시 Claude 서브에이전트로 폴백
 - 폴백: Claude 본체 세션 모델 (`sonnet` 등)
 - 폴백 발생 시 Conductor 가 배지로 고지
+- **현재 권장 경로**: v0.3.0 기준 Claude Code 2.1.109 의 plugin install 이 sensitive userConfig 프롬프트를 띄우지 못하므로, `/ensembra:config → 5) Transports → c) Gemini API key` 에서 인터랙티브 설정 플로우를 사용하는 것이 가장 안전
 
 ## 책임
 1. Phase 0 Context Snapshot 의 **디렉토리 구조·호출 그래프·데이터 흐름**을 바탕으로 현재 아키텍처 파악

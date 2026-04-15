@@ -52,6 +52,39 @@ disable-model-invocation: false
 
 4. **Synthesis**: Conductor(또는 지정된 synthesizer Performer) 가 최종 Plan 합성. 최상단에 **"⚠ 재사용 기회 평가"** 섹션 강제 배치 (`CONTRACT.md` §16.4).
 
+### Transport 호출 규약 (architect = Gemini 경우)
+
+Phase 1 R1 에서 architect Performer 를 호출할 때, Gemini Transport 라면 **키 조회 체인** 을 거쳐 curl 실행:
+
+```bash
+# Step 1: Claude Code userConfig env var (미래 호환)
+GEMINI_KEY="$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY"
+
+# Step 2: fallback 으로 ~/.config/ensembra/env 파일
+if [ -z "$GEMINI_KEY" ] && [ -f ~/.config/ensembra/env ]; then
+  source ~/.config/ensembra/env
+  GEMINI_KEY="$GEMINI_API_KEY"
+fi
+
+# Step 3: 키 없음 → Claude 서브에이전트 폴백
+if [ -z "$GEMINI_KEY" ]; then
+  echo "⚠ architect: gemini → claude-sonnet (fallback, no Gemini key)"
+  # 아래 curl 생략, 대신 Task 툴로 Claude architect 서브에이전트 호출
+  exit 0
+fi
+
+# 정상 경로 — Gemini API 호출
+curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$GEMINI_KEY" \
+  -H 'Content-Type: application/json' \
+  -d "$payload"
+unset GEMINI_KEY GEMINI_API_KEY  # 쉘 변수 즉시 정리
+```
+
+**주의**:
+- 키 값은 로그·Task Report·에이전트 출력 어디에도 노출 금지
+- 호출 종료 직후 `unset` 으로 프로세스 환경에서 제거
+- 폴백 발생 시 Conductor 출력 상단에 배지 표시 (`⚠ architect: gemini → claude-sonnet`)
+
 ### Phase 2 — Execute
 
 Conductor(= 현재 Claude Code 세션) 가 **본인** 도구(`Edit`, `Write`, `Bash`) 로 Plan 을 실행. 외부 Performer 는 이 단계에 관여하지 않는다.

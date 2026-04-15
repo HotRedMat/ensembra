@@ -2,29 +2,51 @@
 
 ## 시크릿 취급 정책 (Q5, Q7 결정 반영)
 
-Ensembra 본체는 **시크릿을 평문으로 보관·커밋하지 않는다**. 유일한 시크릿인 Gemini API 키는 **OS 키체인** 에 격리 저장된다.
+Ensembra 의 유일한 시크릿은 Gemini API 키다. **하이브리드 저장 정책** (v0.3.0+):
 
-- **Gemini 공식 API 키 1종** (v0.2.0+ 정책)
-  - 저장 방식: Claude Code 플러그인 `userConfig.gemini_api_key` + `sensitive: true`
-  - 실제 저장 위치: OS 레벨 시크릿 저장소
-    - **macOS**: Keychain
-    - **Windows**: Credential Manager
-    - **Linux**: Secret Service (gnome-keyring / kwallet) — 불가 시 `~/.claude/.credentials.json`
-  - 암호화: OS 가 제공 (디스크 암호화 + 프로세스 ACL)
-  - 입력 시점: `claude plugin install ensembra` 또는 `claude plugin enable ensembra` 시 Claude Code 가 대화형 프롬프트
-  - 참조 방법:
-    - 스킬·에이전트 본문에서 `${user_config.gemini_api_key}` 로 치환
-    - 서브프로세스 (curl 등) 에서 `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` 환경변수
-  - 빈 값 허용: 키 없으면 architect Performer 는 Claude 서브에이전트로 자동 폴백
-  - 재입력: `claude plugin disable ensembra && claude plugin enable ensembra` 로 userConfig 프롬프트 재출현
+## Gemini API 키 저장 (v0.3.0+ 하이브리드)
 
-- **v0.2.0 전 (deprecated)**: `~/.config/ensembra/env` 평문 파일 방식은 제거됨. 이전 버전을 사용하던 경우 해당 파일은 더 이상 읽히지 않으며 수동 삭제 권장.
+**조회 체인** (우선순위):
 
-Ollama 와 Claude 서브에이전트 Performer 는 시크릿을 요구하지 않는다. Ollama 는 로컬 HTTP, Claude 는 세션 토큰.
+1. **`$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` 환경변수** (이상적 경로)
+   - Claude Code 플러그인 `userConfig.gemini_api_key` + `sensitive: true` 에서 주입
+   - 저장 위치: OS 키체인
+     - macOS Keychain
+     - Windows Credential Manager
+     - Linux Secret Service (gnome-keyring/kwallet) — 불가 시 `~/.claude/.credentials.json`
+   - 암호화: OS 레벨
+   - **현 상태 (Claude Code 2.1.109)**: plugin install 이 sensitive 프롬프트를 띄우지 못하는 버그. 미래 버전에서 해결되면 자동 우선 작동.
 
-ChatGPT 는 Performer 에서 제외됨 (ToS·안정성).
+2. **`~/.config/ensembra/env` 파일** (현재 권장 경로, v0.3.0 워크어라운드)
+   - 포맷: `GEMINI_API_KEY=AIza...`
+   - 권한: **`chmod 600` 강제** (사용자만 읽기 가능)
+   - 생성 방법 2가지:
+     - **Claude Code 내부**: `/ensembra:config → 5) Transports → c) Gemini API key` 인터랙티브 플로우 — 스킬이 직접 Write 툴로 파일 생성
+     - **터미널 직접**: `mkdir -p ~/.config/ensembra && echo 'GEMINI_API_KEY=AIza...' > ~/.config/ensembra/env && chmod 600 ~/.config/ensembra/env`
+   - 보호 수준: 파일시스템 권한 (OS 키체인보다 약하지만 평문 환경변수보다 강함)
+   - 리스크:
+     - 백업·동기화 시스템이 `~/.config/` 를 백업할 경우 노출
+     - `cat` 으로 사용자가 실수로 공유 가능
+     - 완화: 경로가 `~/.config/ensembra/` 라는 네이티브 Linux/macOS 표준 위치라 일반적 백업 도구 (Time Machine 등) 는 제외 권장 대상이 아님
 
-**관련 설정 파일** (`~/.config/ensembra/config.json`): Performer 모델 매핑·프리셋·라운드 등 **비시크릿** 설정만 저장. **시크릿은 이 파일에 절대 포함되지 않음**. `chmod 600` 권장 (사용자 설정 프라이버시).
+3. **둘 다 없음** — architect Performer 는 Claude 서브에이전트로 자동 폴백. Ensembra 는 완전히 작동 (단지 Gemini 를 안 쓸 뿐).
+
+## 왜 하이브리드가 필요한가
+
+v0.2.0 에서 순수 `userConfig` 경로로 전환했지만, Claude Code 2.1.109 의 plugin install 과 `/plugin` UI 모두 sensitive userConfig 필드의 입력·저장을 제대로 처리하지 못하는 **런타임 버그** 가 확인됨. 이 버그가 해결되기 전까지 Ensembra 사용자는 Gemini 설정을 할 수 없음.
+
+v0.3.0 은 Claude Code 가 고쳐지는 미래와 현재를 **동시에 지원** 한다. userConfig 선언은 유지하므로 고쳐진 버전에선 자동으로 최상위 경로가 작동한다.
+
+## 대안 Performer 는 시크릿 불필요
+
+- **Ollama** (security, qa): 로컬 HTTP `http://localhost:11434`, 키 없음
+- **Claude 서브에이전트** (planner, developer, devils-advocate, scribe): 세션 토큰 자동 사용
+
+ChatGPT 는 Performer 에서 제외됨 (ToS·안정성 사유).
+
+## config.json 은 여전히 시크릿 없음
+
+`~/.config/ensembra/config.json` 은 Performer 모델 매핑·프리셋·라운드 등 **비시크릿 설정만** 저장. 시크릿은 `env` 파일에 격리. `chmod 600` 권장.
 
 ## 위협 모델
 

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/HotRedMat/ensembra/releases"><img src="https://img.shields.io/badge/version-0.2.1-blue" alt="version"/></a>
+  <a href="https://github.com/HotRedMat/ensembra/releases"><img src="https://img.shields.io/badge/version-0.3.0-blue" alt="version"/></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="license"/></a>
   <img src="https://img.shields.io/badge/plugin%20validate-passing-brightgreen" alt="plugin validate"/>
   <img src="https://img.shields.io/badge/verification-end--to--end-brightgreen" alt="verification"/>
@@ -113,28 +113,40 @@ ollama pull qwen2.5:14b llama3.1:8b
 
 ### Gemini setup (optional, for architect)
 
-Ensembra uses Claude Code's native `userConfig` mechanism with `sensitive: true`, so the Gemini API key is stored in your **OS keychain** — never in a plaintext file on disk.
+Ensembra v0.3.0 uses a **hybrid key lookup chain** for maximum compatibility:
 
-**First-time setup** — when you install or enable the plugin, Claude Code prompts you for the key:
+1. `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` — Claude Code native `userConfig` (OS keychain, future-proof)
+2. `~/.config/ensembra/env` — `chmod 600` file (current workaround for Claude Code 2.x)
+3. Nothing → architect falls back to a Claude sub-agent
 
-```bash
-claude plugin install ensembra
-# Claude Code asks for gemini_api_key (paste it; input is hidden)
+**Why two paths?** Claude Code 2.1.109's plugin install flow currently cannot prompt for `sensitive: true` userConfig values. Ensembra declares the `userConfig` field anyway (forward-compatible) and additionally supports a plain env file as a workaround until Claude Code is fixed.
+
+#### Recommended: in-session setup via `/ensembra:config`
+
+Inside Claude Code, run:
+
+```
+/ensembra:config
+→ 5) Transports
+→ c) Gemini API key
 ```
 
-Or if you already installed without a key and want to add it now:
+The skill walks you through key entry, writes `~/.config/ensembra/env` with `chmod 600`, and verifies the key with a real API call. No terminal editing required.
+
+> ⚠ Any key you paste into the Claude Code conversation is logged in `~/.claude/history.jsonl`. Rotate the key after testing if you consider the history sensitive.
+
+#### Alternative: terminal one-liner
 
 ```bash
-claude plugin disable ensembra
-claude plugin enable ensembra
-# The userConfig prompt reappears
+mkdir -p ~/.config/ensembra
+read -s -p "Gemini API key: " K && echo "GEMINI_API_KEY=$K" > ~/.config/ensembra/env && chmod 600 ~/.config/ensembra/env && unset K
 ```
+
+The `read -s` hides the input and the key is never in shell history.
 
 **Get a free API key** at <https://aistudio.google.com/app/apikey>. Default model is `gemini-2.5-flash`.
 
-**Leave it blank if you don't want Gemini** — the architect performer will fall back to a Claude sub-agent automatically. No Gemini account required to use Ensembra.
-
-Stored in: macOS Keychain, Windows Credential Manager, or Linux Secret Service (gnome-keyring / kwallet). Never touches `~/.config/ensembra/` or any file you'd accidentally share.
+**Leave it unset if you don't want Gemini** — the architect performer will fall back to a Claude sub-agent automatically. No Gemini account required to use Ensembra.
 
 ## Reuse-First Policy
 

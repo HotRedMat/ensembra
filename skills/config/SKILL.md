@@ -68,14 +68,119 @@ Ensembra 설정
 1~4, 9, 10 번호 입력 시: "이 항목은 강제 on 입니다" 안내만.
 
 ### (5) Transports
-- a) Ollama endpoint (기본 `http://localhost:11434`, 플러그인 userConfig.ollama_endpoint 와 연동)
+- a) Ollama endpoint (기본 `http://localhost:11434`)
 - b) Ollama health check → `curl -s /api/tags`
-- c) Gemini API 키 상태 표시
-  - `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` 환경변수가 비어있지 않으면 `✓ set (OS keychain)` 표시, 값은 절대 출력 금지
-  - 비어있으면 `✗ not set` + "키 재설정은 `claude plugin disable ensembra && claude plugin enable ensembra` 로 수행 (userConfig 프롬프트 재출현)" 안내
-  - 이 스킬은 키를 직접 저장하지 않음 — Claude Code 의 OS 키체인 네이티브 메커니즘에 위임
-- d) Gemini health check → `curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=${CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY}"` 응답 200 / 에러 표시
+- c) **Gemini API key — 인터랙티브 설정 플로우** (v0.3.0+)
+- d) Gemini health check
 - e) Claude 폴백 모델 선택
+
+#### (5)c Gemini API key 인터랙티브 플로우
+
+Claude Code 2.1.109 의 plugin install 이 sensitive userConfig 프롬프트를 띄우지 못하는 버그를 우회하기 위해, 이 스킬이 직접 키 설정 플로우를 제공한다.
+
+**1. 현재 상태 조회** — 다음 순서로 키 존재 확인:
+
+```bash
+# Step 1: Claude Code userConfig 환경변수 (미래 호환)
+if [ -n "$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY" ]; then
+  echo "SOURCE=env_var LEN=${#CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY}"
+fi
+
+# Step 2: ~/.config/ensembra/env 파일 (현재 워크어라운드)
+if [ -f ~/.config/ensembra/env ] && grep -q '^GEMINI_API_KEY=' ~/.config/ensembra/env; then
+  echo "SOURCE=env_file"
+fi
+```
+
+**2. 상태 표시** (값 절대 출력 금지):
+
+```
+Gemini API key lookup chain:
+  1. $CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY  : ✗ not set
+  2. ~/.config/ensembra/env                : ✗ not set
+  → architect will fall back to Claude sub-agent
+
+Set up Gemini now? (y/n)
+```
+
+또는 설정됐으면:
+
+```
+Gemini API key lookup chain:
+  1. $CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY  : ✗ not set
+  2. ~/.config/ensembra/env                : ✓ set (length=39)
+  → architect will use Gemini (gemini-2.5-flash)
+
+Actions:
+  r) Replace key
+  d) Delete key (disable Gemini)
+  t) Test API call (health check)
+  0) Back
+```
+
+**3. 사용자가 `y` (설정) 또는 `r` (교체) 선택 시**:
+
+보안 경고 출력:
+```
+⚠ 보안 안내:
+다음 메시지에 Gemini API key 를 붙여넣으면 ~/.claude/history.jsonl
+대화 히스토리에 기록됩니다. 테스트 완료 후 키를 로테이션
+하는 것을 강력히 권장합니다.
+
+무료 키 발급: https://aistudio.google.com/app/apikey
+
+계속하시겠습니까? (y/n)
+```
+
+`y` 확인 시:
+```
+다음 메시지에 Gemini API key 만 붙여넣으세요 (예: AIza... 로 시작):
+```
+
+**4. 사용자가 다음 메시지에 키 제출 → Conductor 가 즉시 수행**:
+
+```bash
+# 디렉토리 보장
+mkdir -p ~/.config/ensembra
+
+# 파일 작성 (Write 툴 사용, 키 값은 여기서 절대 로그에 쓰지 마라)
+cat > ~/.config/ensembra/env <<ENV_FILE
+GEMINI_API_KEY=<사용자가_제출한_키>
+ENV_FILE
+
+# 권한 강제
+chmod 600 ~/.config/ensembra/env
+
+# 검증 — curl 호출로 실제 응답 확인 (키 값은 출력 금지)
+source ~/.config/ensembra/env
+response=$(curl -s -m 10 "https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_API_KEY")
+if echo "$response" | jq -e '.models' > /dev/null; then
+  echo "✓ Gemini API key saved and verified"
+  echo "  file: ~/.config/ensembra/env (chmod 600)"
+  echo "  models accessible: $(echo "$response" | jq '.models | length')"
+else
+  echo "✗ Gemini API error:"
+  echo "$response" | jq -r '.error.message' | head -3
+  echo "  (파일은 저장되었지만 키가 유효하지 않을 수 있습니다)"
+fi
+```
+
+**5. 절대 규칙**:
+- 키 값을 화면 출력에 포함 금지 (길이·프리뷰 해시만 허용)
+- 저장 후 즉시 `chmod 600` 강제
+- 검증 실패 시에도 파일은 그대로 두되, 사용자에게 "키 확인 필요" 만 안내
+- 에이전트는 자신의 출력에 키를 포함해 저장하지 않음 — Task Report, 인수인계서, 로그 모두
+
+**6. Claude Code userConfig 가 미래 버전에서 고쳐진 경우**:
+- `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` 가 주입되면 그게 자동으로 우선 (조회 체인 step 1)
+- env 파일은 두 번째 우선순위로 폴백
+- 사용자는 아무 조치 없이도 자동 마이그레이션됨 (env 파일을 지울지 말지 선택)
+
+#### (5)d Gemini health check
+사용자 선택 시 현재 조회 체인으로 로드한 키로 실제 API 호출. 응답 200 + 모델 목록 표시, 또는 에러 메시지.
+
+#### (5)e Claude 폴백 모델
+Gemini/Ollama 불가 시 architect/security/qa 가 사용할 Claude 모델 선택 (opus/sonnet/haiku).
 
 ### (6) Timeouts
 Ollama/Gemini/Claude-subagent/Deep-Scan 각각 초 단위.
@@ -158,7 +263,12 @@ Quick Select:
 `schemas/config.json` 의 JSON Schema 를 준수. 저장 시 스키마 검증 수행.
 
 ## 보안
-- Gemini API 키는 **OS 키체인** 에 저장됨 (Claude Code `userConfig.gemini_api_key` + `sensitive: true`). 평문 파일 저장 없음.
-- 이 스킬은 키 값을 화면에 **절대 출력하지 않음** — 설정 여부만 `✓ set / ✗ not set` 로 표시
-- `config.json` 에는 시크릿 포함 금지 (키는 OS 키체인에 격리)
+- Gemini API 키 조회 체인 (v0.3.0+):
+  1. `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` (Claude Code `userConfig` + OS 키체인, 미래 호환)
+  2. `~/.config/ensembra/env` 파일 (Claude Code 2.x userConfig 버그 워크어라운드, `chmod 600` 강제)
+- **이상적 경로**: OS 키체인 (Claude Code 가 제대로 작동할 때)
+- **현실적 경로**: `chmod 600` 파일 (현재 Claude Code 2.1.109 기준)
+- 이 스킬은 키 값을 화면에 **절대 출력하지 않음** — 존재 여부와 길이만 표시
+- `config.json` 에는 시크릿 포함 금지 (키는 env 파일 또는 키체인에 격리)
 - `SECURITY.md` 마스킹 규칙 준수 — 로그·보고서에서 `x-goog-api-key`, `key=`, `GEMINI_API_KEY`, `CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` 모두 `[REDACTED]`
+- 사용자가 키를 대화에 붙여넣은 경우 즉시 경고: "대화 히스토리에 기록되므로 테스트 후 로테이션 권장"

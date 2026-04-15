@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-04-16
+
+### Changed — hybrid secret storage (critical for real-world installability)
+
+- **Gemini API key storage switched to a hybrid lookup chain.** v0.2.x declared `userConfig.gemini_api_key` with `sensitive: true` and relied exclusively on Claude Code's native plugin secret mechanism. Field testing with Claude Code 2.1.109 revealed a runtime bug: neither `claude plugin install` nor the `/plugin` UI can actually prompt for or persist sensitive userConfig values. Non-sensitive fields like `ollama_endpoint` are partially handled but don't propagate as env vars to subprocesses either. This made v0.2.x effectively non-functional for Gemini configuration.
+- **v0.3.0 restores the `~/.config/ensembra/env` fallback** while keeping the `userConfig` declarations so the plugin is forward-compatible. The key lookup chain is now:
+  1. `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` — Claude Code userConfig (will take precedence automatically when Claude Code fixes the bug)
+  2. `~/.config/ensembra/env` with `GEMINI_API_KEY=...` and `chmod 600` — current workaround
+  3. Neither set → architect performer falls back to a Claude sub-agent
+
+### Added — in-session interactive key setup
+
+- **`/ensembra:config → 5) Transports → c) Gemini API key`** now provides a complete interactive setup flow that runs entirely inside Claude Code. The skill:
+  1. Displays the current lookup-chain state (which source, if any, has the key; never the value)
+  2. Offers to set up, replace, delete, or test the key
+  3. On set-up, warns about conversation-history implications before asking the user to paste the key
+  4. Uses the Write tool to create `~/.config/ensembra/env` with `chmod 600`
+  5. Verifies with a real Gemini API health-check call
+  6. Reports success/failure without ever echoing the key value
+
+  No terminal editing required; the whole flow is inside Claude Code.
+
+- **Alternative terminal path documented**: `read -s -p "Gemini API key: " K && echo ...` one-liner for users who prefer not to paste secrets into the Claude Code conversation (which would be logged in `~/.claude/history.jsonl`).
+
+### Fixed
+
+- v0.2.x plugin install blocker (`Plugin ensembra has an invalid manifest file`) — already fixed in v0.2.1 by adding `type` and `title` to userConfig entries. v0.3.0 inherits that fix.
+
+### Security
+
+- The env file path is protected with `chmod 600`. This is weaker than OS keychain (v0.2.x's intended model) but stronger than any mutable `config.json`-based secret storage. The hybrid approach means users on a fixed Claude Code version get the keychain path automatically.
+- `SECURITY.md` updated to document the hybrid policy and the Claude Code 2.x workaround rationale.
+- `CONTRACT.md` §8.4 fully rewritten for the hybrid chain.
+
+### Migration from v0.2.x
+
+If you were on v0.2.0 or v0.2.1 and never managed to set up Gemini (most likely), just update and run the in-session config flow:
+
+```bash
+claude plugin marketplace update ensembra
+claude plugin update ensembra@ensembra
+# In Claude Code:
+/reload-plugins
+/ensembra:config  # navigate to 5 → c → follow the prompts
+```
+
+### Gate3 tracking
+
+- `TODO(gate3)`: once Claude Code ships a fix for the userConfig sensitive field handling, deprecate the env file path in v0.4.0 and remove it in v0.5.0.
+
 ## [0.2.1] — 2026-04-16
 
 ### Fixed
@@ -119,7 +169,8 @@ If you never set up an env file, no action needed — just `claude plugin update
 - Ensembra itself needs installation on a real project to test the full pipeline
 - Ollama and Gemini API key setup must be done manually before first use
 
-[Unreleased]: https://github.com/HotRedMat/ensembra/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/HotRedMat/ensembra/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/HotRedMat/ensembra/releases/tag/v0.3.0
 [0.2.1]: https://github.com/HotRedMat/ensembra/releases/tag/v0.2.1
 [0.2.0]: https://github.com/HotRedMat/ensembra/releases/tag/v0.2.0
 [0.1.0]: https://github.com/HotRedMat/ensembra/releases/tag/v0.1.0
