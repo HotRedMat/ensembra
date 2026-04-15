@@ -17,7 +17,7 @@
 -
 
 ## Design alignment
-- [ ] Changes are consistent with `CONTRACT.md` §1–§17
+- [ ] Changes are consistent with `CONTRACT.md` §1–§18
 - [ ] If behavior changed, `CONTRACT.md` was updated in the same PR
 - [ ] If a performer role or transport changed, `INTERVIEW.md` decision log was updated
 - [ ] `CHANGELOG.md` Unreleased section was updated

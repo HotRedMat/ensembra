@@ -11,6 +11,12 @@
       "const": 1,
       "description": "스키마 버전. 마이그레이션에 사용."
     },
+    "plan_tier": {
+      "type": "string",
+      "enum": ["pro", "max"],
+      "default": "pro",
+      "description": "Claude 플랜 기반 실행 프로파일. pro = Claude Pro 사용자 기준 (Deep Scan 압축, Context Snapshot 요약, R2 diff 전달, Audit 1명). max = Claude Max 사용자 기준 (preset 원본 동작 유지). 우선순위: /ensembra:run --tier=... 인자 > 본 필드 > 'pro'. 세부 규칙은 CONTRACT.md §17 및 skills/run/SKILL.md 의 Tier Resolution 섹션 참조."
+    },
     "performers": {
       "type": "object",
       "description": "역할별 Transport·모델 매핑",

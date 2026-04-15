@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Plan Tier Overlay
+
+- **`plan_tier` 설정 신설** — Claude 플랜(Pro/Max) 별로 파이프라인 실행 강도를 조절하는 오버레이. preset 자체는 건드리지 않고 위에 겹쳐 적용된다.
+  - `pro` (기본): Deep Scan 선택 4항목 off + 강제 6항목 중 3·4·10 압축, Context Snapshot 심볼 목록만, R2 합의율 ≥85% 면 스킵·아니면 diff 요약 전달, Audit 감사자 첫 1명, scribe 입력 요약본. feature 1회 실행 기준 **예상 토큰 ~30%**
+  - `max`: preset 원본 동작 그대로 (기존 Ensembra 와 동일)
+- **우선순위**: `/ensembra:run --tier=pro|max` 인자 > `~/.claude/config/ensembra/config.json.plan_tier` > 기본값 `"pro"`
+- **Auto-Escalation**: pro 실행 중 R1 합의율 40~70% 구간 진입 시 Conductor 가 1회 한정 max R2 승격을 사용자에게 제안
+- **금지선** (tier 로 토글 불가): `feature` preset 의 `security`/`qa` Performer 참여, `rounds.*_consensus` 임계값, `reuse_first.device_*` 토글, Deep Scan 강제 6항목의 "미수행" (압축·범위 축소는 허용)
+- `/ensembra:config` 메인 메뉴에 **10) Plan Tier** 추가. 기존 "Reset" 은 11번으로 이동
+
+### Changed
+
+- `schemas/config.json`: `plan_tier` 속성 추가 (enum `pro`/`max`, 기본값 `pro`)
+- `skills/run/SKILL.md`: 인자 파싱에 `--tier=` 옵션 추가, **Plan Tier Resolution** 섹션 신설, Phase 0/1/3/4 본문에 tier 훅 삽입, 출력 포맷에 `🎚 plan_tier` 배지 추가
+- `skills/config/SKILL.md`: 메인 메뉴 항목 재번호(Reset 10→11), Plan Tier 서브메뉴 신설
+- `CONTRACT.md`: §17 "Plan Tier Profiles" 신설. 기존 §17 "Gate2 이월 항목" 은 §18 로 이동
+- `.github/PULL_REQUEST_TEMPLATE.md`: `§1–§17` → `§1–§18`
+- `.github/ISSUE_TEMPLATE/feature_request.yml`: Gate2 참조를 §18 로 갱신
+
+### Design rationale
+
+Claude Pro 5시간 롤링 윈도우에서는 토큰 총량보다 **메시지 호출 횟수·컨텍스트 크기**가 실질 병목이다. Performer 수·라운드 수는 preset 정체성이므로 건드리지 않고, **Performer 에 전달되는 입력 크기**와 **R2·Audit 호출 횟수** 를 줄이는 축으로 절감한다. 품질에 가장 민감한 `security`/`qa` 참여와 합의율 임계값은 금지선으로 보호해 "절약 때문에 결론이 뒤집히는" 사고를 구조적으로 차단.
+
 ## [0.5.1] — 2026-04-16
 
 ### Fixed (critical — v0.5.0 was non-functional for Gemini)

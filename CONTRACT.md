@@ -718,7 +718,52 @@ Synthesis 최상단에 항상 배치 (해당 없으면 "없음" 표시):
 
 ---
 
-## 17. Gate2 이월 항목
+## 17. Plan Tier Profiles
+
+Ensembra 는 Claude 플랜(Pro / Max) 에 따라 파이프라인 실행 강도를 조절하는 **Plan Tier** 오버레이를 갖는다. Tier 는 preset 위에 겹쳐 적용되며, preset 자체는 수정하지 않는다.
+
+### 17.1 Tier 값
+
+- `pro` (기본) — Claude Pro 사용자. 5시간 롤링 메시지 한도를 고려해 토큰·호출 횟수를 최소화
+- `max` — Claude Max 사용자. preset 원본 동작을 그대로 수행 (기존 Ensembra 동작과 동일)
+
+### 17.2 우선순위
+
+1. `/ensembra:run --tier=pro|max` 인자 (본 실행 한정)
+2. `~/.claude/config/ensembra/config.json` 의 `plan_tier` 필드
+3. 기본값 `"pro"`
+
+### 17.3 프로파일 규칙
+
+| 축 | pro | max |
+|---|---|---|
+| Deep Scan forced | 1·2·9 전문, 3·4·10 압축 | 전부 전문 |
+| Deep Scan optional | 전부 off (preset 지시 무시) | preset 지시 따름 |
+| Context Snapshot | 심볼·경로 인벤토리만 | 본문 발췌 포함 |
+| Phase 1 R2 실행 | R1 합의율 ≥85% 면 스킵 | preset `rounds` 그대로 |
+| Phase 1 R2 prior_outputs | diff 요약 (400자/Performer) | 전체 출력 |
+| Phase 3 Audit 감사자 | preset `auditors` 첫 1명 | 전원 |
+| Phase 4 scribe 입력 | Phase 요약본 (500자/Phase) | 원본 기록 |
+
+### 17.4 금지선 (tier 로 토글 불가)
+
+- `feature` preset 의 `security` / `qa` Performer 참여
+- `rounds.*_consensus` 임계값
+- `reuse_first.device_*` 토글
+- Deep Scan 강제 6항목의 "미수행" (압축·범위 축소는 허용, 완전 skip 은 금지 — §4 참조)
+
+### 17.5 Auto-Escalation
+
+pro tier 실행 중 R1 합의율이 40~70% 구간에 진입하면 Conductor 는 사용자에게 1회 한정 max 승격을 제안한다. 승격 수락 시 해당 실행에 한해 R2 를 max 방식(전체 출력 전달)으로 수행한다. Auto-Escalation 은 Audit·scribe 단계에는 적용되지 않는다 (비용 급증 방지).
+
+### 17.6 조정 경로
+
+- 본 실행 한정: `/ensembra:run <preset> --tier=max <요청>`
+- 영구 저장: `/ensembra:config → Plan Tier`
+
+---
+
+## 18. Gate2 이월 항목
 
 - `TODO(gate2)`: 위 JSON Schema 를 실제 파일(`schemas/*.json`)로 분리하고 런타임 검증기 연결.
 - `TODO(gate2)`: 라운드 타임아웃·재시도 정책 숫자 확정.
@@ -741,5 +786,6 @@ Synthesis 최상단에 항상 배치 (해당 없으면 "없음" 표시):
 - `TODO(gate2)`: Wide Scan 성능 최적화 (범위 축소 자동 제안, 진행률 표시).
 - `TODO(gate2)`: Deep Scan 확장 후보 11~16 (lint/typecheck/runtime log/TODO/benchmark/API spec) 언어 확정 후 추가 검토.
 - `TODO(gate2)`: devils-advocate 섹션 품질 개선 (git log 주석·롤백 커밋·과거 Task Report 학습).
+- `TODO(gate2)`: **Plan Tier × Model 축 확장 검토** — §17 Plan Tier 오버레이에 Claude Performer 모델 다운그레이드 축 추가 여부. 선행 조건: pro/max 실측 3~5회 샘플로 실제 토큰 소비·합의율 차이 수집. 금지선: `security`/`qa`/`planner` 는 tier 무관 원본 모델 유지. 사용자가 `performerConfig.model` 을 명시 지정한 경우 tier override 는 덮어쓰지 않음.
 - `TODO(gate2)`: `/ensembra:report daily|weekly` 스킬 구현 + Task Report 집계 로직.
 - `TODO(gate2)`: `/ensembra:transfer` 스킬 구현 + scope 자연어 해석 (planner 연계).

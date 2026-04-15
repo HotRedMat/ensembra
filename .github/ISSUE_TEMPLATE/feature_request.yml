@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Before filing, please check `CONTRACT.md` §17 (Gate2 이월 항목) — your idea might already be tracked there.
+        Before filing, please check `CONTRACT.md` §18 (Gate2 이월 항목) — your idea might already be tracked there.
 
   - type: textarea
     id: problem
@@ -61,7 +61,7 @@ body:
     attributes:
       label: Confirmation
       options:
-        - label: I searched existing issues and Gate2/Gate3 ideas in CONTRACT.md §17
+        - label: I searched existing issues and Gate2/Gate3 ideas in CONTRACT.md §18
           required: true
         - label: This is not a request to add ChatGPT integration (out of scope per design decisions)
           required: true

@@ -10,17 +10,60 @@ disable-model-invocation: false
 ## 인자 파싱
 사용자 입력 `$ARGUMENTS` 를 다음 형식으로 파싱:
 ```
-<preset> <요청 문자열>
+<preset> [--tier=pro|max] <요청 문자열>
 ```
 - `<preset>`: `feature` / `bugfix` / `refactor` / `security-audit` / `source-analysis` 중 하나
+- `--tier=` (선택): 본 실행에 한해 Plan Tier 강제. 생략 시 config → 기본값 `pro` 순으로 해석
 - `<요청>`: 자연어 문자열
 
-프리셋이 없거나 불명확하면 사용자에게 되묻는다.
+프리셋이 없거나 불명확하면 사용자에게 되묻는다. `--tier` 값이 `pro|max` 외이면 오류로 중단.
+
+## Plan Tier Resolution
+
+Phase 0 진입 **직전** 에 tier 를 확정한다. 우선순위:
+
+1. `--tier=` 인자 (본 실행 한정)
+2. `~/.claude/config/ensembra/config.json` 의 `plan_tier` 필드
+3. 기본값 `"pro"`
+
+확정된 tier 는 Phase 0~4 전 과정에 동일하게 적용된다. Conductor 는 **Phase 0 시작 전** 한 줄 배지로 반드시 알린다:
+
+```
+🎚 plan_tier: pro (Deep Scan 3/10, Context=symbols, R2=diff-only, Audit=1명)
+🎚 plan_tier: max (Deep Scan preset 원본, Context=full, R2=full, Audit=preset 전원)
+```
+
+### Tier 프로파일 (고정값)
+
+| 축 | **pro** (기본) | **max** |
+|---|---|---|
+| Deep Scan 강제 6항목 | 1·2·9 는 전문 수행, 3·4 는 압축(핵심 심볼만), 10 은 상위 디렉토리 목록만 | 현행 전부 수행 |
+| Deep Scan 선택 4항목 | preset `deep_scan.optional` 지시 **무시**, 전부 off | preset `deep_scan.optional` 지시 따름 |
+| Context Snapshot | 심볼 목록·경로 인벤토리만 (파일 본문 생략) | 현행 (본문 발췌 포함) |
+| Phase 1 R2 전달 | 이전 라운드 출력의 **diff 요약** (신규 쟁점·변경 위치만) | 이전 라운드 **전체 출력** |
+| Phase 1 R2 스킵 | R1 Peer Signature 합의율 ≥ 85% 면 R2 자동 스킵 (rounds yaml 무시) | preset `rounds` 그대로 |
+| Phase 3 Audit 감사자 | preset `audit.auditors` 의 **첫 1명** 만 호출 | preset `audit.auditors` 전원 |
+| Phase 4 scribe 입력 | Phase 0~3 기록의 **요약본** (각 Phase 당 500자 이내) | Phase 0~3 **원본 기록** |
+
+### 금지선 (pro 에서도 절대 양보 불가)
+
+- feature preset 의 `security` / `qa` Performer 는 pro 에서도 참여 유지
+- 합의율 임계값 (`rounds.*_consensus`) 은 tier 와 무관 — config 값 그대로 사용
+- Reuse-First 장치 4개 (config `reuse_first.device_*`) 는 tier 로 토글 금지
+- Deep Scan 강제 6항목은 "압축"·"범위 축소" 는 허용하되 "미수행" 은 불가 (§ 금지 참조)
+
+### 합의율 저하 시 Auto-Escalation
+
+pro 로 실행 중 R1 합의율이 40~70% 구간에 진입하면 Conductor 는 사용자에게 제안:
+```
+⚠ R1 합의율 62% — pro tier 에서 R2 전체 전달로 임시 상향 조정하시겠습니까? (y/n)
+```
+`y` → 해당 실행 한정으로 R2 는 max 방식으로 전환. `n` → pro R2 diff 방식 유지 또는 중단.
 
 ## 파이프라인 실행 순서
 
 ### Phase 0 — Gather (Deep Scan)
-`presets/{preset}.yaml` 의 `deep_scan` 설정을 읽고, 다음을 **병렬 tool call** 로 수행:
+`presets/{preset}.yaml` 의 `deep_scan` 설정을 읽되, **Plan Tier Resolution** 결과를 겹쳐 적용한다. `tier=pro` 면 optional 4항목은 모두 off, forced 6항목 중 3·4·10 은 압축 모드. `tier=max` 면 preset 지시 그대로. 확정된 체크리스트로 다음을 **병렬 tool call** 로 수행:
 
 1. **강제 6항목** (끌 수 없음):
    - 구조 파악: `Glob "**/*"` 상위 디렉토리 + 진입점 파일(`main.*`, `index.*`, `app.*`) 식별
@@ -37,12 +80,19 @@ disable-model-invocation: false
    - 설정: `.env.example`, `config/*` Read
 
 3. 수집 결과를 단일 **Context Snapshot** (Markdown) 으로 압축. 각 Performer 입력 `constraints.context_snapshot` 에 첨부.
+   - `tier=pro`: 심볼 목록·경로 인벤토리만 포함. 파일 본문 발췌 금지.
+   - `tier=max`: 현행 — 핵심 파일 본문 발췌 포함.
 
 ### Phase 1 — Deliberate
 
 1. **R1 독립 분석**: `presets/{preset}.yaml` 의 `performers` 목록의 각 Performer 를 순차 호출 (subagent 또는 외부 Transport). 각자에게 **동일한** `problem` + `context_snapshot` 전달. 서로의 답을 보지 못함.
 
-2. **R2 반론** (조건부): `rounds` 설정에 따라. `presets/{preset}.yaml` 의 `rounds: [R1, R2, synthesis]` 면 실행. 각 Performer 에게 **이전 라운드 전체 출력** 을 `prior_outputs` 로 전달. R2 출력엔 `peer_signatures` 필수.
+2. **R2 반론** (조건부): `rounds` 설정 + **Plan Tier** 에 따라.
+   - `tier=max`: preset `rounds: [R1, R2, synthesis]` 이면 항상 실행. `prior_outputs` 는 이전 라운드 **전체 출력**.
+   - `tier=pro`: R1 Peer Signature 합의율 ≥ 85% 면 R2 **자동 스킵**. 85% 미만이면 실행하되 `prior_outputs` 는 **diff 요약** (신규 쟁점, 반대 지점, 변경 제안 위치만 — 각 Performer 당 400자 이내).
+   - 합의율 40~70% 구간 진입 시 §Plan Tier Resolution 의 Auto-Escalation 규칙 적용.
+
+   R2 출력엔 `peer_signatures` 필수.
 
 3. **합의율 계산**:
    - Peer Signature 매트릭스에서 agree 비율 계산
@@ -86,7 +136,7 @@ Plan 의 각 파일 변경 항목에 대해:
 
 ### Phase 3 — Audit
 
-`presets/{preset}.yaml` 의 `audit.auditors` 목록에 있는 Performer 들을 순차 호출. 각자에게 Plan + Phase 2 diff 전달.
+`presets/{preset}.yaml` 의 `audit.auditors` 목록을 **Plan Tier** 로 필터링 후 순차 호출. `tier=pro` 면 목록의 **첫 1명** 만, `tier=max` 면 전원. 각자에게 Plan + Phase 2 diff 전달.
 
 감사자 출력 스키마:
 ```json
@@ -110,13 +160,18 @@ Rework 시 Phase 1 복귀, **Plan diff 만** 전달. Rework 상한 2회 (config 
 - `feature`/`refactor`: Task Report + Design Doc + Request Spec
 - 그 외: Task Report 만
 
-scribe 는 Phase 0~3 기록 전체를 입력으로 받고, 템플릿 슬롯을 채운다. 완료 후 파일 저장 경로를 사용자에게 보고.
+scribe 의 입력은 **Plan Tier** 로 결정:
+- `tier=pro`: Phase 0~3 기록의 **요약본** (각 Phase 당 500자 이내, Conductor 가 사전 압축)
+- `tier=max`: Phase 0~3 **원본 기록** 전체
+
+scribe 는 받은 입력으로 템플릿 슬롯을 채운다. 완료 후 파일 저장 경로를 사용자에게 보고.
 
 ## 출력 포맷
 최종 사용자 응답은 다음 구조:
 ```
 ## Ensembra Run — {preset}
 
+🎚 **plan_tier**: pro    (또는 max)
 **결과**: Pass (Audit 통과)
 **합의율**: 84%
 **Rework 횟수**: 0

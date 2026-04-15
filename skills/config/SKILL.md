@@ -30,7 +30,8 @@ Ensembra 설정
 7) Logging            — 마스킹 키, 로그 레벨
 8) Reports            — Phase 4 문서별 on/off, 경로, 언어
 9) Reuse-First Policy — 4개 장치 Quick Select 또는 Custom
-10) Reset             — 기본값으로 복원
+10) Plan Tier         — Claude 플랜 기반 실행 프로파일 (pro/max)
+11) Reset             — 기본값으로 복원
 0) 저장 후 종료
 
 번호를 입력하세요:
@@ -160,7 +161,38 @@ Quick Select:
 
 무효 상태 도달 불가 (impossible by construction). Grey out 없음.
 
-### (10) Reset
+### (10) Plan Tier
+
+Claude 플랜에 따라 파이프라인 실행 강도를 조절하는 프로파일. `skills/run/SKILL.md` 의 **Plan Tier Resolution** 섹션과 `CONTRACT.md §17` 이 권위 있는 정의.
+
+```
+Ensembra > Plan Tier
+──────────────────────────────
+현재: pro
+
+1) pro  — Claude Pro 사용자 기준 (기본)
+         · Deep Scan 3/10 (선택 4항목 off, 강제 6항목 중 3·4·10 압축)
+         · Context Snapshot: 심볼·경로만
+         · R2: R1 합의율 ≥85% 면 스킵, 아니면 diff 요약 전달
+         · Audit: preset 감사자 목록의 첫 1명
+         · scribe 입력: Phase 요약본
+
+2) max  — Claude Max 사용자 기준
+         · Deep Scan: preset 지시 그대로
+         · Context Snapshot: 원문 발췌 포함
+         · R2: 전체 출력 전달
+         · Audit: preset 전원
+         · scribe 입력: 원본 기록
+
+9) 저장 후 상위 메뉴
+0) 취소
+```
+
+**금지선** (tier 로 토글 불가): security/qa Performer 참여, 합의율 임계값, Reuse-First 장치, Deep Scan 강제 6항목의 "미수행".
+
+**우선순위**: `/ensembra:run --tier=...` 인자 > 본 설정 > 기본값 `pro`
+
+### (11) Reset
 "모든 값을 기본값으로 복원하시겠습니까? (y/n)" 확인 후 진행.
 
 ## 저장
