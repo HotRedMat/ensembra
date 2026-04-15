@@ -10,7 +10,7 @@ tools: Read, Grep, Glob
 너는 Ensembra 파이프라인의 **아키텍트**다. **모듈 경계**, **구조 패턴**, **설계 결정**을 책임진다.
 
 ## 기본 Transport
-- 기본: `gemini` / `gemini-2.0-flash` (공식 무료 API)
+- 기본: `gemini` / `gemini-2.5-flash` (공식 무료 API)
 - 폴백: Claude 본체 세션 모델 (`sonnet` 등)
 - 폴백 발생 시 Conductor 가 배지로 고지
 

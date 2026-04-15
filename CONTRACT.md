@@ -219,7 +219,7 @@ Performer 는 이종(heterogeneous) 이다. Conductor 는 각 Performer 의 `tra
 }
 ```
 
-- `transport: "gemini"` 일 때는 `endpoint` 대신 `model` 만 지정 (예: `gemini-2.0-flash`).
+- `transport: "gemini"` 일 때는 `endpoint` 대신 `model` 만 지정 (예: `gemini-2.5-flash`).
 - `transport: "claude-subagent"` 일 때는 `model` 에 Claude 모델(`opus`/`sonnet`/`haiku`) + `agent_name` 으로 `.claude/agents/*.md` 의 `name` 참조.
 
 ### 8.3 외부 LLM 응답 파싱 계약
@@ -300,7 +300,7 @@ Synthesis 는 서명 매트릭스로 합의율을 계산:
 
 토론 Performer **6명** + Phase 4 전용 Performer **1명**:
 - 🧭 **planner** (`claude-subagent` / `opus`)
-- 🏛 **architect** (`gemini` / `gemini-2.0-flash`)
+- 🏛 **architect** (`gemini` / `gemini-2.5-flash`)
 - 🛠 **developer** (`claude-subagent` / `sonnet`)
 - 🛡 **security** (`ollama` / `qwen2.5:14b`)
 - 🧪 **qa** (`ollama` / `llama3.1:8b`)
@@ -375,7 +375,7 @@ Deep Scan 은 Claude Code 의 병렬 tool call 로 수행. 외부 Performer 는 
 Health check 실패 시:
 1. 같은 transport 내 다른 모델로 폴백 가능하면 폴백 (예: `qwen2.5:14b` 실패 → `llama3.1:8b` 로)
 2. 그것도 불가능하면 **Claude Code 본체 모델로 폴백** (transport=claude-subagent)
-3. 폴백 발생은 Conductor 출력 상단에 배지로 고지 (`⚠ architect: gemini-2.0-flash → claude-sonnet (fallback)`)
+3. 폴백 발생은 Conductor 출력 상단에 배지로 고지 (`⚠ architect: gemini-2.5-flash → claude-sonnet (fallback)`)
 
 ### 13.3 Config 파일 스키마 (`~/.config/ensembra/config.json`)
 
@@ -383,7 +383,7 @@ Health check 실패 시:
 {
   "performers": {
     "planner":         {"transport": "claude-subagent", "model": "opus"},
-    "architect":       {"transport": "gemini",          "model": "gemini-2.0-flash"},
+    "architect":       {"transport": "gemini",          "model": "gemini-2.5-flash"},
     "security":        {"transport": "ollama",          "model": "qwen2.5:14b"},
     "qa":              {"transport": "ollama",          "model": "llama3.1:8b"},
     "devils-advocate": {"transport": "claude-subagent", "model": "haiku"}
@@ -396,7 +396,7 @@ Health check 실패 시:
 ```
 
 **기본 모델표** (Q1 확정):
-- planner=opus / architect=gemini-2.0-flash / developer=sonnet / security=qwen2.5:14b / qa=llama3.1:8b / devils-advocate=**haiku** / scribe=sonnet
+- planner=opus / architect=gemini-2.5-flash / developer=sonnet / security=qwen2.5:14b / qa=llama3.1:8b / devils-advocate=**haiku** / scribe=sonnet
 
 주의: 위 §13.3 JSON 예시에는 `developer` 와 `scribe` 항목이 생략되어 있지만 실제 기본값은 포함된다. 예시는 차이 나는 항목만 보이기 위한 축약.
 

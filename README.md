@@ -2,49 +2,135 @@
 
 > Where agents perform in concert — a multi-agent orchestrator plugin for Claude Code.
 
-**Status**: Gate2 in progress — v0.1.0 plugin structure complete, runtime validation pending.
+[![plugin validate](https://img.shields.io/badge/plugin%20validate-passing-brightgreen)](https://github.com/HotRedMat/ensembra)
+[![version](https://img.shields.io/badge/version-0.1.0-blue)](https://github.com/HotRedMat/ensembra/releases)
+[![license](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 
-## Overview
-Ensembra orchestrates multiple sub-agents through a **5-phase pipeline** with a **Reuse-First cross-cutting policy**. Designed for solo developers who want structured deliberation, mutual supervision, and automatic documentation.
+## What is Ensembra?
 
-## Pipeline
-1. **Gather** — Deep Scan of repo (6 forced + 4 optional items)
-2. **Deliberate** — R1 → R2 → Synthesis with 70/40 consensus threshold
-3. **Execute** — Claude Code performs the agreed Plan
-4. **Audit** — designated performers verify the diff
-5. **Document** — scribe records Task Report / Design / Request / Daily / Weekly
+Ensembra is a Claude Code plugin that orchestrates **six specialist agents** and **one scribe** through a **5-phase pipeline** to produce structured code reviews, mutual supervision, automatic documentation, and project handover documents. Built for solo developers who want team-level deliberation without the team.
 
-## Performers (6 deliberators + 1 scribe)
-- 🧭 **planner** — requirements interpretation
-- 🏛 **architect** — module boundaries and patterns
-- 🛠 **developer** — implementation strategy
-- 🛡 **security** — threats and secrets
-- 🧪 **qa** — edge cases and regression
-- 😈 **devils-advocate** — counter-arguments
-- ✍️ **scribe** — Phase 4 documentation (not a deliberator)
+**Key ideas**:
+- **Separation of deliberation and execution**: external LLMs (Ollama / Gemini) debate, Claude Code executes.
+- **Reuse-First cross-cutting policy**: four toggleable devices force every performer to consider existing code before writing new code.
+- **Deep Source Inspection**: 10-item checklist (6 forced + 4 optional) prevents shallow reads.
+- **Consensus-driven flow**: 70/40 thresholds gate Phase 2 execution and halt pipeline on strong disagreement.
+- **Automatic documentation**: every task produces a report; weekly roll-ups and handover documents are built-in.
 
-## Transports
-- **Ollama** (local, free) — `qwen2.5:14b`, `llama3.1:8b`
-- **Gemini** (official free API) — `gemini-2.0-flash`
-- **Claude sub-agents** — `opus`, `sonnet`, `haiku`
-- Automatic fallback to Claude when external transports are unavailable
+## 5-Phase Pipeline
+
+```
+Phase 0 Gather     — Deep Scan produces a shared context snapshot
+Phase 1 Deliberate — R1 → (optional R2) → Synthesis with peer signatures
+Phase 2 Execute    — Claude Code edits files per the agreed plan
+Phase 3 Audit      — designated performers verify the diff
+Phase 4 Document   — scribe records Task / Design / Request / Daily / Weekly
+```
+
+## Performers
+
+| Role | Responsibility | Default Transport | Default Model |
+|---|---|---|---|
+| 🧭 **planner** | Requirements, acceptance criteria | Claude sub-agent | `opus` |
+| 🏛 **architect** | Module boundaries, patterns | Gemini | `gemini-2.5-flash` |
+| 🛠 **developer** | Implementation strategy | Claude sub-agent | `sonnet` |
+| 🛡 **security** | Threats, secrets, OWASP | Ollama | `qwen2.5:14b` |
+| 🧪 **qa** | Edge cases, regression | Ollama | `llama3.1:8b` |
+| 😈 **devils-advocate** | Counter-arguments, YAGNI | Claude sub-agent | `haiku` |
+| ✍️ **scribe** | Phase 4 documentation | Claude sub-agent | `sonnet` |
+
+All models auto-fall back to Claude sub-agents when the external transport is unavailable.
 
 ## Skills
-- `/ensembra:run <preset> <request>` — main pipeline
-- `/ensembra:config` — unified settings picker (all options)
-- `/ensembra:transfer [scope]` — handover document
+
+- `/ensembra:run <preset> <request>` — main pipeline entry point
+- `/ensembra:config` — unified interactive settings picker (all options, all cascade-safe)
+- `/ensembra:transfer [scope]` — project handover document (full project, path, or natural-language scope)
 - `/ensembra:report daily|weekly` — roll-up reports
 
 ## Presets
-`feature`, `bugfix`, `refactor`, `security-audit`, `source-analysis`, `transfer`
+
+| Preset | Performers | Rounds | Phase 2 | Phase 3 Audit | Phase 4 |
+|---|---|---|---|---|---|
+| `feature` | all 6 | R1→R2→Syn | on | all 6 | Task+Design+Request |
+| `bugfix` | planner+architect+developer+qa | R1→Syn | on | qa+security | Task |
+| `refactor` | architect+developer+devils+qa | R1→R2→Syn | on | architect+devils | Task+Design+Request |
+| `security-audit` | security+devils+architect | R1→Syn | off | — | Task |
+| `source-analysis` | architect+security+developer | R1→Syn | off | — | Task |
+| `transfer` | all 6 + scribe | R1 only | off | off | handover doc |
+
+## Installation
+
+### Option A — Load directly for testing
+
+```bash
+cd /path/to/your/project
+claude --plugin-dir /path/to/ensembra
+```
+
+### Option B — Install via marketplace
+
+```bash
+claude plugin marketplace add HotRedMat/ensembra
+claude plugin install ensembra@ensembra
+```
+
+### Ollama setup (optional, for security/qa)
+
+```bash
+ollama pull qwen2.5:14b llama3.1:8b
+```
+
+### Gemini setup (optional, for architect)
+
+```bash
+mkdir -p ~/.config/ensembra
+echo 'GEMINI_API_KEY=<your-key>' > ~/.config/ensembra/env
+chmod 600 ~/.config/ensembra/env
+```
+
+Get a free API key at <https://aistudio.google.com/app/apikey>. Default model is `gemini-2.5-flash`.
+
+## Reuse-First Policy
+
+Four devices, toggleable via `/ensembra:config → Reuse-First Policy`:
+
+1. **Deep Scan Inventory** — Phase 0 collects all reusable symbols from `commons/`, `shared/`, `lib/`, etc.
+2. **Schema Field** — every R1 output must include `reuse_analysis.decision: reuse | extend | new` with justification
+3. **Auto Disagree** — R2 peers automatically disagree when `new` decisions have weak justification (regex-matched)
+4. **Synthesis Report** — a fixed top-level section reports missed reuse opportunities
+
+Quick Select: **Maximum** (default) / Strong / Balanced / Advisory / Off. Custom mode uses cascade rules so no invalid combination is reachable.
 
 ## Out of scope
-Session handoff notes (mid-work pause/resume) are handled by external plugins such as `d2-ops-handoff`, not Ensembra.
+
+- **Session handoff notes** (mid-work pause/resume) — use external plugins like `d2-ops-handoff`
+- **ChatGPT integration** — excluded for ToS and stability reasons; use Claude/Gemini/Ollama
 
 ## Documentation
-- `CONTRACT.md` — pipeline contract, schemas, Reuse-First policy (Korean)
-- `INTERVIEW.md` — design decision log (Korean)
-- `SECURITY.md` — threat model and secret handling (Korean)
+
+- [`CONTRACT.md`](./CONTRACT.md) — pipeline contract, schemas, Reuse-First policy (Korean)
+- [`INTERVIEW.md`](./INTERVIEW.md) — design decision log (Korean)
+- [`SECURITY.md`](./SECURITY.md) — threat model and secret handling (Korean)
+- [`CHANGELOG.md`](./CHANGELOG.md) — version history and verification results
+- [`docs/transfer/2026-04-15-project.md`](./docs/transfer/2026-04-15-project.md) — Ensembra's own handover document (generated by Ensembra itself)
+
+## Verification status
+
+`v0.1.0` is fully verified at the structural and behavioral level:
+
+- `claude plugin validate` passes
+- All 8 agents invoked individually in live sessions
+- End-to-end runs on `feature`, `bugfix`, `refactor`, `security-audit`, `source-analysis` presets
+- `transfer` generated a 528-line handover document for the Ensembra project itself
+- `/ensembra:report daily|weekly` handles both populated and empty-week states
+- **Rework loop** triggered twice on an intentionally-weak email validator, converging on pass with 19 tests
+- **Halt-on-low-consensus** triggered on a deliberately controversial refactor request (0% consensus, pipeline stopped before Phase 2)
+- **Ensembra's `source-analysis` preset caught 4 real drift bugs in Ensembra's own code** — the strongest possible proof that the plugin catches real bugs
+- **All three transports verified end-to-end**: Ollama (`qwen2.5:14b`, `llama3.1:8b`), Gemini (`gemini-2.5-flash`), Claude sub-agents
+
+See [`CHANGELOG.md`](./CHANGELOG.md) for the full verification log.
 
 ## License
+
 MIT © 2026 Seungho Lee

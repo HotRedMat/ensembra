@@ -11,7 +11,7 @@ model: opus
 
 ## Performer 풀
 - 🧭 **planner** (claude-subagent / opus) — 요구사항 해석, 의도 파악
-- 🏛 **architect** (gemini / gemini-2.0-flash) — 모듈 경계, 구조 패턴
+- 🏛 **architect** (gemini / gemini-2.5-flash) — 모듈 경계, 구조 패턴
 - 🛠 **developer** (claude-subagent / sonnet) — 구현 전략, 패턴·라이브러리 선택
 - 🛡 **security** (ollama / qwen2.5:14b) — 위협 모델, 권한, 시크릿
 - 🧪 **qa** (ollama / llama3.1:8b) — 테스트 전략, 엣지케이스
