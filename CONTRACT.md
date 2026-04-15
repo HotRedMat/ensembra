@@ -244,13 +244,14 @@ Performer 는 이종(heterogeneous) 이다. Conductor 는 각 Performer 의 `tra
 **조회 체인** (우선순위 순):
 
 1. `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` 환경변수
-   - Claude Code 가 `userConfig.gemini_api_key` (sensitive) 로부터 주입
-   - OS 키체인 저장 (macOS Keychain / Windows Credential Manager / Linux Secret Service)
-   - 미래 Claude Code 버전에서 버그가 고쳐지면 자동 우선 작동
+   - Claude Code 가 `userConfig.gemini_api_key` (`sensitive: true`) 로부터 hook subprocess 에 주입
+   - OS 키체인 저장 (macOS Keychain 또는 `~/.claude/.credentials.json`)
+   - **⚠ 중요**: Claude Code 2.1.109 의 바이너리 리버싱 결과 이 환경변수는 **hooks 전용** 으로 주입된다. 일반 skills/agents 의 Bash 도구 환경에는 주입되지 않음. 따라서 현재 step 1 은 hooks 기반 경로에서만 작동하며, skills 에서 직접 읽기는 불가. skills 에선 `${user_config.KEY}` 템플릿 치환으로 값을 얻어야 함 (Gate3 이월: skills 의 user_config 치환 실제 동작 확인 + 구현)
 2. `~/.config/ensembra/env` 파일의 `GEMINI_API_KEY=...`
    - `chmod 600` 강제
-   - 디스크 평문 저장 (파일시스템 권한 기반 보호)
-   - Claude Code 2.x 워크어라운드
+   - 디스크 저장 (파일시스템 권한 기반 보호)
+   - **현재 skills 에서 작동하는 유일한 경로**
+   - `bin/ensembra-set-key` 스크립트 (v0.4.0+) 로 안전하게 설정
 3. 둘 다 없음 → architect Performer 는 Claude 서브에이전트로 폴백
 
 **전송**:

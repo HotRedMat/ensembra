@@ -255,6 +255,35 @@ ensembra/
   - 메인 메뉴 8개 + 서브메뉴, 상세 `CONTRACT.md` §14
   - **근거**: Claude Code `/config` 와 동일한 UX 일관성. 1인 개발자가 플래그·JSON 문법을 외울 필요 없음. 모든 런타임 결정을 한 곳에 집중.
 
+- **2026-04-16 — Claude Code 2.1.109 userConfig 실제 규격 확인 (바이너리 리버싱)**
+  - 우리가 v0.2.x → v0.3.0 → v0.4.0 에 걸쳐 "Claude Code 버그" 로 단정한 userConfig sensitive 필드 처리를, Claude Code 바이너리 (`~/.local/share/claude/versions/2.1.109`, Mach-O arm64 201MB) 의 strings 로 리버싱해 실제 규격을 확인
+  - **발견 1 — sensitive 필드는 실제로 구현되어 있다**:
+    - 바이너리 내 Zod 스키마 문자열: `sensitive:y.boolean().optional().describe("If true, masks dialog input and stores value in secure storage (keychain/credentials file) instead of settings.json")`
+    - 문서 문자열: `"Prompted at enable time. Non-sensitive values saved to settings.json; sensitive values to secure storage (macOS keychain or .credentials.json). Available as ${user_config.KEY} in MCP/LSP server config, hook commands, and..."`
+  - **발견 2 — `/plugin` UI 의 정확한 경로**:
+    - `if (plugin.manifest.userConfig && Object.keys(plugin.manifest.userConfig).length > 0) menu.push({label: "Configure options", action: () => G({type: "configuring-options", schema: plugin.manifest.userConfig})})`
+    - 즉 `/plugin → ensembra → Enter → "Configure options" 서브메뉴 → dialog` 흐름이 정식 경로
+  - **발견 3 — CLAUDE_PLUGIN_OPTION_ 환경변수 범위**:
+    - 바이너리 문자열: `"become CLAUDE_PLUGIN_OPTION_<KEY> env vars in hooks"`
+    - 즉 `${user_config.KEY}` 치환은 MCP/LSP server config, hook commands 에서 되고, `$CLAUDE_PLUGIN_OPTION_KEY` 환경변수는 **hook subprocess** 에만 주입됨
+    - **일반 skills/agents 의 Bash 도구 환경에는 주입 안 됨** (우리가 이전에 보던 `✗ not set` 현상의 원인)
+  - **발견 4 — keychain 저장 에러 경로**:
+    - `"Failed to save sensitive plugin options for ${H} to secure storage"` 에러 메시지 문자열 존재
+    - `"[keychain] read failed; serving stale cache"` 경고 존재
+    - keychain 저장이 실패할 수 있는 여러 경로가 구현되어 있음
+  - **결론**:
+    - Claude Code 가 "버그" 라는 이전 가설은 **틀림**. 규격대로 작동 중
+    - 우리가 이전에 수행한 `/plugin → ensembra → Enter` 시도는 "Configure options" 서브메뉴 진입 전 단계에서 멈췄을 가능성이 높음
+    - `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` 가 skill 에서 비어있던 것은 버그가 아니라 **설계상 hook 전용** 이었음
+  - **영향**:
+    - v0.3.0 하이브리드 chain 의 step 1 (`$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY`) 은 **skills 에서 작동하지 않는 것이 정상** — 이 인식으로 CONTRACT.md §8.4 수정 필요
+    - v0.4.0 의 `ensembra-set-key` 는 여전히 정당함 (Bash 도구 stdin 제약 회피 + skills 에서 키 읽기 가능한 env 파일 저장)
+    - `/plugin` UI 경로 "Configure options" 서브메뉴는 정식 방법으로 README 에 추가 가능
+  - **Gate3 이월 제안**:
+    - README 에 `/plugin → ensembra → Configure options` 네비게이션 가이드 추가
+    - CONTRACT.md §8.4 에 skills 의 hybrid chain 에서 step 1 이 "hooks 전용" 임을 명시
+    - `ensembra-set-key` 는 "UI 경로 + 추가 편의" 로 포지셔닝 재정리
+
 - **2026-04-16 — v0.4.0 `ensembra-set-key` 스크립트 도입 (Ensembra 자체 deliberation 결과)**
   - Ensembra 파이프라인을 자기 자신에게 적용해서 v0.3.0 의 Gemini 키 설정 UX 결함을 분석
   - 4 Performer (architect/security/developer/devils-advocate) R1 병렬 호출

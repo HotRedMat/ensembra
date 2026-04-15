@@ -121,7 +121,25 @@ Ensembra v0.3.0 uses a **hybrid key lookup chain** for maximum compatibility:
 
 **Why two paths?** Claude Code 2.1.109's plugin install flow currently cannot prompt for `sensitive: true` userConfig values. Ensembra declares the `userConfig` field anyway (forward-compatible) and additionally supports a plain env file as a workaround until Claude Code is fixed.
 
-#### Recommended: `ensembra-set-key` (v0.4.0+)
+#### Path A: `/plugin → ensembra → Configure options` (native Claude Code UI)
+
+This is the official Claude Code path for setting `userConfig` values. Inside Claude Code run:
+
+```
+/plugin
+```
+
+Use `↓` to move the cursor to `ensembra`, press **Enter** to open the plugin detail view, then look for a **"Configure options"** item and press Enter again. Claude Code will render a dialog with the `gemini_api_key` and `ollama_endpoint` fields from the plugin manifest. The Gemini key field is declared `sensitive: true` so the input is masked and saved to your OS keychain (macOS Keychain, or `~/.claude/.credentials.json` on Linux), not to `settings.json`.
+
+After entering the key:
+
+```
+/reload-plugins
+```
+
+If you can't find the "Configure options" item, fall back to Path B below. Path B works everywhere and does not depend on the Claude Code UI version.
+
+#### Path B: `ensembra-set-key` (script, v0.4.0+)
 
 Ensembra ships a `bin/ensembra-set-key` script that's added to your `$PATH` automatically when the plugin is enabled. Open any terminal and run:
 

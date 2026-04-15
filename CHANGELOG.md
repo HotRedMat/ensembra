@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Investigated (2026-04-16)
+
+- **Reverse-engineered Claude Code 2.1.109's `userConfig` handling** to determine whether the Gemini key setup bug is a Claude Code defect or a misunderstanding on our side. Extracted strings from the binary (`~/.local/share/claude/versions/2.1.109`, Mach-O arm64, 201 MB) and found:
+  - `sensitive: true` is fully implemented: `"If true, masks dialog input and stores value in secure storage (keychain/credentials file) instead of settings.json"`
+  - `/plugin` UI exposes a `"Configure options"` submenu whenever `userConfig` has entries: `if (plugin.manifest.userConfig && Object.keys(...).length > 0) menu.push({label: "Configure options", ...})`
+  - `${user_config.KEY}` template substitution and `$CLAUDE_PLUGIN_OPTION_KEY` env vars are documented as working in **MCP/LSP configs, hook commands, and skill/agent content** — but the env var injection path in the binary is explicitly scoped to hook subprocesses: `"become CLAUDE_PLUGIN_OPTION_<KEY> env vars in hooks"`
+- **Revised diagnosis**: Claude Code is not broken. Our earlier tests hit the wrong UI path — pressing Enter on `ensembra` in `/plugin` lands on the detail view, but the sensitive field prompt lives one level deeper, under the explicit **"Configure options"** submenu item. Previous troubleshooting sessions never navigated to that submenu and concluded the feature was absent.
+- **Also revised**: the `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` environment variable was never going to appear in the skill's Bash subprocess even if the key was saved correctly, because that env var is only injected into hooks — not into skill tool calls. What skills can use is the `${user_config.gemini_api_key}` template substitution, which needs to be verified as a separate path.
+
+### Documented
+
+- `README.md`: added **Path A** (`/plugin → ensembra → Enter → Configure options`) as the native Claude Code way to set the Gemini key, with **Path B** (`ensembra-set-key`) as the cross-context fallback.
+- `CONTRACT.md` §8.4: step 1 of the hybrid lookup chain is now annotated as "hook subprocess only" to prevent future confusion.
+- `INTERVIEW.md`: added the full reverse-engineering findings as a design decision log entry for Gate3 to act on.
+
+### Gate3 follow-ups
+
+- `TODO(gate3)`: empirically verify whether `${user_config.gemini_api_key}` template substitution actually works in skill/agent markdown bodies as the binary docs claim. If it does, skills can use it directly without reading an env file.
+- `TODO(gate3)`: if Path A (`/plugin → Configure options`) does work end-to-end for users, demote `ensembra-set-key` to an alternative rather than the primary flow.
+- `TODO(gate3)`: file a Claude Code documentation request to clarify that sensitive userConfig values reach skills via `${user_config.KEY}` substitution only, not via `$CLAUDE_PLUGIN_OPTION_KEY` env vars.
+
 ## [0.4.1] — 2026-04-16
 
 ### Fixed
