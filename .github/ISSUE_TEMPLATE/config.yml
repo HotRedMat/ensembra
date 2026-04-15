@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and discussions
+    url: https://github.com/HotRedMat/ensembra/discussions
+    about: Ask questions, share ideas, or discuss Ensembra usage patterns.
+  - name: Official Claude Code plugin docs
+    url: https://code.claude.com/docs/en/plugins
+    about: Claude Code plugin system documentation.

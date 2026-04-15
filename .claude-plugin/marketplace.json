@@ -1,0 +1,47 @@
+{
+  "name": "ensembra",
+  "owner": {
+    "name": "Seungho Lee",
+    "email": "misstal80@gmail.com"
+  },
+  "metadata": {
+    "description": "Ensembra — multi-agent orchestrator plugin for Claude Code. This marketplace hosts the Ensembra plugin from the same repository.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "ensembra",
+      "source": "./",
+      "description": "Six specialist agents + scribe in a 5-phase pipeline (Gather/Deliberate/Execute/Audit/Document) with Reuse-First cross-cutting policy. Built for solo developers.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Seungho Lee",
+        "email": "misstal80@gmail.com"
+      },
+      "homepage": "https://github.com/HotRedMat/ensembra",
+      "repository": "https://github.com/HotRedMat/ensembra",
+      "license": "MIT",
+      "keywords": [
+        "orchestrator",
+        "multi-agent",
+        "deliberation",
+        "review",
+        "audit",
+        "reuse-first",
+        "handover",
+        "code-review",
+        "refactor"
+      ],
+      "category": "productivity",
+      "tags": [
+        "multi-agent",
+        "orchestrator",
+        "solo-developer",
+        "code-review",
+        "auto-documentation",
+        "ollama",
+        "gemini"
+      ]
+    }
+  ]
+}

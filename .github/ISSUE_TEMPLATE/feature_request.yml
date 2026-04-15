@@ -1,0 +1,67 @@
+name: ✨ Feature request
+description: Suggest a new capability, preset, performer role, transport, or skill for Ensembra.
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing, please check `CONTRACT.md` §17 (Gate2 이월 항목) — your idea might already be tracked there.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the pain point. Focus on *why*, not *how*.
+      placeholder: "When running /ensembra:run refactor on a large monorepo, Deep Scan takes too long because it walks the entire tree..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: A concrete mechanism. Reference CONTRACT.md sections if relevant.
+      placeholder: "Add a presets.feature.deep_scan.scope field that limits walking to a subtree..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      multiple: true
+      options:
+        - agents (performer role)
+        - skills (/ensembra:*)
+        - presets (yaml)
+        - schemas (json)
+        - transports (Ollama/Gemini/Claude)
+        - Reuse-First policy
+        - config picker
+        - documentation
+        - build/CI
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What else did you think about? Why is your proposal better?
+
+  - type: textarea
+    id: migration
+    attributes:
+      label: Backward compatibility
+      description: Does this change require a config schema version bump? Preset breaking change?
+      placeholder: "Adds a new optional field; existing configs work unchanged."
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Confirmation
+      options:
+        - label: I searched existing issues and Gate2/Gate3 ideas in CONTRACT.md §17
+          required: true
+        - label: This is not a request to add ChatGPT integration (out of scope per design decisions)
+          required: true

@@ -1,0 +1,115 @@
+name: Plugin validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Structure and JSON validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate JSON files
+        run: |
+          set -e
+          for f in .claude-plugin/plugin.json .claude-plugin/marketplace.json schemas/*.json; do
+            echo "checking $f"
+            jq -e . "$f" > /dev/null
+          done
+
+      - name: Check required files
+        run: |
+          set -e
+          required=(
+            ".claude-plugin/plugin.json"
+            ".claude-plugin/marketplace.json"
+            "LICENSE"
+            "README.md"
+            "CHANGELOG.md"
+            "CONTRACT.md"
+            "SECURITY.md"
+            "agents/orchestrator.md"
+            "agents/planner.md"
+            "agents/architect.md"
+            "agents/developer.md"
+            "agents/security.md"
+            "agents/qa.md"
+            "agents/devils-advocate.md"
+            "agents/scribe.md"
+            "skills/run/SKILL.md"
+            "skills/config/SKILL.md"
+            "skills/transfer/SKILL.md"
+            "skills/report/SKILL.md"
+            "presets/feature.yaml"
+            "presets/bugfix.yaml"
+            "presets/refactor.yaml"
+            "presets/security-audit.yaml"
+            "presets/source-analysis.yaml"
+            "presets/transfer.yaml"
+            "schemas/agent-input.json"
+            "schemas/agent-output.json"
+            "schemas/config.json"
+          )
+          missing=0
+          for f in "${required[@]}"; do
+            if [ ! -f "$f" ]; then
+              echo "MISSING: $f"
+              missing=1
+            fi
+          done
+          exit $missing
+
+      - name: Check plugin manifest fields
+        run: |
+          set -e
+          name=$(jq -r '.name' .claude-plugin/plugin.json)
+          version=$(jq -r '.version' .claude-plugin/plugin.json)
+          license=$(jq -r '.license' .claude-plugin/plugin.json)
+          if [ "$name" != "ensembra" ]; then
+            echo "plugin name drift: $name"
+            exit 1
+          fi
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "invalid semver: $version"
+            exit 1
+          fi
+          if [ "$license" != "MIT" ]; then
+            echo "license drift: $license"
+            exit 1
+          fi
+          echo "plugin.json fields OK: $name $version $license"
+
+      - name: Check agent frontmatter has required fields
+        run: |
+          set -e
+          for f in agents/*.md; do
+            name=$(awk '/^name:/ {print $2; exit}' "$f")
+            desc=$(awk '/^description:/ {print; exit}' "$f")
+            if [ -z "$name" ]; then
+              echo "$f: missing name"
+              exit 1
+            fi
+            if [ -z "$desc" ]; then
+              echo "$f: missing description"
+              exit 1
+            fi
+            echo "  ok: $f ($name)"
+          done
+
+      - name: No secrets check
+        run: |
+          set -e
+          patterns='AIza[0-9A-Za-z_-]{30}|ghp_[0-9A-Za-z]{30}|xoxb-[0-9]+-|AKIA[0-9A-Z]{16}'
+          if git grep -E "$patterns" -- ':!*.md' ':!CHANGELOG.md' 2>/dev/null; then
+            echo "possible secret detected"
+            exit 1
+          fi
+          echo "no secret patterns in source files"

@@ -1,0 +1,110 @@
+name: 🐛 Bug report
+description: Report a defect in Ensembra — an agent misbehaves, a skill fails, a preset misroutes, etc.
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill out as much of the form below as you can.
+        If this is a security issue, **do not file it here** — email `misstal80@gmail.com` instead.
+
+  - type: input
+    id: version
+    attributes:
+      label: Ensembra version
+      description: From `plugin.json` or `/plugin list`
+      placeholder: "0.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: claude-code-version
+    attributes:
+      label: Claude Code version
+      description: Output of `claude --version`
+      placeholder: "2.1.109"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: skill
+    attributes:
+      label: Which skill triggered the bug?
+      options:
+        - /ensembra:run
+        - /ensembra:config
+        - /ensembra:transfer
+        - /ensembra:report
+        - Agent invocation (not a skill)
+        - Plugin load / validate
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: preset
+    attributes:
+      label: Which preset (if applicable)?
+      options:
+        - "feature"
+        - "bugfix"
+        - "refactor"
+        - "security-audit"
+        - "source-analysis"
+        - "transfer"
+        - "N/A"
+    validations:
+      required: false
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: "I expected Phase 3 Audit to Rework because qa flagged fail..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      placeholder: "Pipeline proceeded to Phase 4 without Rework..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. `cd /tmp/sandbox`
+        2. `claude --plugin-dir /path/to/ensembra --print "/ensembra:run bugfix ..."`
+        3. Observe output
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output or logs
+      description: Redact any secrets. API keys, tokens, `.env` contents, etc. should never appear here.
+      render: shell
+
+  - type: textarea
+    id: config
+    attributes:
+      label: `~/.config/ensembra/config.json` (if customized)
+      description: Only the reuse_first / rounds / performers sections. Omit the full file if it contains other settings.
+      render: json
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Confirmation
+      options:
+        - label: I searched existing issues and did not find a duplicate
+          required: true
+        - label: I verified `claude plugin validate .` passes in my installation
+          required: false
+        - label: I removed all secrets from the above fields
+          required: true
