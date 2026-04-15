@@ -1,0 +1,48 @@
+name: transfer
+description: 프로젝트 인수인계서 생성. Wide Scan + R1 only + scribe 특수 모드. 읽기 전용.
+
+performers:
+  - planner
+  - architect
+  - developer
+  - security
+  - qa
+  - devils-advocate
+  - scribe  # Phase 4 담당
+
+rounds: [R1]  # 토론·반론 없음
+
+deep_scan:
+  mode: wide  # 전 레포 범위
+  forced: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]  # 전부 강제 on
+  wide_extras:
+    git_log_days: 30  # 최근 30일 전 레포 커밋
+    todo_scan: true   # TODO/FIXME/XXX 주석 전수 집계
+
+phase2:
+  execute: false  # 읽기 전용
+
+phase3:
+  audit: false  # 수정이 없으므로 감사 불필요
+
+phase4:
+  document: true
+  mode: transfer  # 특수 모드, 섹션 분담 취합
+  template:
+    sections:
+      - 0. 요약 (scribe)
+      - 1. 프로젝트 목적·목표 (planner)
+      - 2. 아키텍처 (architect)
+      - 3. 빌드·실행·개발환경 (developer)
+      - 4. 보안·시크릿·계정 (security)
+      - 5. 테스트 현황 (qa)
+      - 6. ⚠ 주의할 함정 (devils-advocate)
+      - 7. 최근 변경 이력 (scribe)
+      - 8. 열린 이슈·다음 단계 (scribe)
+      - 9. 참고 문서 (scribe)
+      - 10. 부록 의존성 스냅샷 (scribe)
+  generate:
+    transfer_doc: true
+    task_report: false    # transfer 는 태스크 리포트 불필요
+    design_doc: false
+    request_spec: false

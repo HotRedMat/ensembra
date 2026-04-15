@@ -1,0 +1,30 @@
+name: feature
+description: 신규 기능 개발. 전 Performer 참여 토론, 전원 감사, 문서 3종 생성.
+
+performers:
+  - planner
+  - architect
+  - developer
+  - security
+  - qa
+  - devils-advocate
+
+rounds: [R1, R2, synthesis]
+
+deep_scan:
+  forced: [1, 2, 3, 4, 9, 10]
+  optional: [5, 6, 7, 8]  # 전부 on (기본값)
+
+phase2:
+  execute: true
+
+phase3:
+  audit: true
+  auditors: [planner, architect, developer, security, qa, devils-advocate]
+
+phase4:
+  document: true
+  generate:
+    task_report: true    # 강제
+    design_doc: true     # feature 만
+    request_spec: true   # feature 만

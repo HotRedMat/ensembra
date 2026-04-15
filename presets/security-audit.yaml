@@ -1,0 +1,26 @@
+name: security-audit
+description: 보안 감사 (읽기 전용). security+devils-advocate+architect 참여, R1→Synthesis, 파일 수정 없음.
+
+performers:
+  - security
+  - devils-advocate
+  - architect
+
+rounds: [R1, synthesis]
+
+deep_scan:
+  forced: [1, 2, 3, 4, 9, 10]
+  optional: [7, 8]  # 의존성·설정이 핵심 (CVE·시크릿 위치)
+
+phase2:
+  execute: false  # 읽기 전용
+
+phase3:
+  audit: false  # 수정이 없으므로 감사 불필요
+
+phase4:
+  document: true
+  generate:
+    task_report: true  # 감사 결과 기록
+    design_doc: false
+    request_spec: false

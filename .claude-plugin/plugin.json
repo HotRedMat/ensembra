@@ -1,0 +1,21 @@
+{
+  "name": "ensembra",
+  "version": "0.1.0",
+  "description": "Multi-agent orchestrator plugin for Claude Code — agents perform in concert through a 5-phase pipeline (Gather → Deliberate → Execute → Audit → Document) with Reuse-First cross-cutting policy.",
+  "author": {
+    "name": "Seungho Lee",
+    "email": "misstal80@gmail.com"
+  },
+  "homepage": "https://github.com/HotRedMat/ensembra",
+  "repository": "https://github.com/HotRedMat/ensembra",
+  "license": "MIT",
+  "keywords": [
+    "orchestrator",
+    "multi-agent",
+    "deliberation",
+    "review",
+    "audit",
+    "reuse-first",
+    "handover"
+  ]
+}

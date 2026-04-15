@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/HotRedMat/ensembra/schemas/config.json",
+  "title": "Ensembra User Config",
+  "description": "사용자 설정 (~/.config/ensembra/config.json). /ensembra:config 선택형 picker 가 저장",
+  "type": "object",
+  "required": ["version", "performers"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "스키마 버전. 마이그레이션에 사용."
+    },
+    "performers": {
+      "type": "object",
+      "description": "역할별 Transport·모델 매핑",
+      "properties": {
+        "planner":         { "$ref": "#/$defs/performerConfig" },
+        "architect":       { "$ref": "#/$defs/performerConfig" },
+        "developer":       { "$ref": "#/$defs/performerConfig" },
+        "security":        { "$ref": "#/$defs/performerConfig" },
+        "qa":              { "$ref": "#/$defs/performerConfig" },
+        "devils-advocate": { "$ref": "#/$defs/performerConfig" },
+        "scribe":          { "$ref": "#/$defs/performerConfig" }
+      },
+      "additionalProperties": false
+    },
+    "fallback": {
+      "type": "object",
+      "description": "외부 Transport 실패 시 최종 폴백",
+      "properties": {
+        "transport": { "type": "string", "const": "claude-subagent" },
+        "model": { "type": "string" }
+      }
+    },
+    "rounds": {
+      "type": "object",
+      "properties": {
+        "r2_trigger_file_count": { "type": "integer", "minimum": 1, "default": 5 },
+        "r2_trigger_consensus":  { "type": "integer", "minimum": 0, "maximum": 100, "default": 70 },
+        "synthesis_consensus":   { "type": "integer", "minimum": 0, "maximum": 100, "default": 70 },
+        "halt_consensus":        { "type": "integer", "minimum": 0, "maximum": 100, "default": 40 },
+        "rework_limit":          { "type": "integer", "minimum": 0, "default": 2 }
+      }
+    },
+    "deep_scan": {
+      "type": "object",
+      "description": "Deep Scan 체크리스트 10항목. 강제 6개는 항상 true.",
+      "properties": {
+        "item_1_structure":        { "type": "boolean", "const": true },
+        "item_2_keyword_trace":    { "type": "boolean", "const": true },
+        "item_3_call_graph":       { "type": "boolean", "const": true },
+        "item_4_data_flow":        { "type": "boolean", "const": true },
+        "item_5_test_map":         { "type": "boolean", "default": true },
+        "item_6_git_history":      { "type": "boolean", "default": true },
+        "item_7_dependencies":     { "type": "boolean", "default": true },
+        "item_8_configuration":    { "type": "boolean", "default": true },
+        "item_9_reuse_inventory":  { "type": "boolean", "const": true },
+        "item_10_docs_inventory":  { "type": "boolean", "const": true }
+      }
+    },
+    "transports": {
+      "type": "object",
+      "properties": {
+        "ollama": {
+          "type": "object",
+          "properties": {
+            "endpoint": { "type": "string", "format": "uri", "default": "http://localhost:11434" }
+          }
+        },
+        "gemini": {
+          "type": "object",
+          "properties": {
+            "env_file_path": { "type": "string", "default": "~/.config/ensembra/env" }
+          }
+        }
+      }
+    },
+    "timeouts": {
+      "type": "object",
+      "properties": {
+        "ollama_sec":          { "type": "integer", "minimum": 1, "default": 120 },
+        "gemini_sec":          { "type": "integer", "minimum": 1, "default": 60 },
+        "claude_subagent_sec": { "type": "integer", "minimum": 1, "default": 300 },
+        "deep_scan_sec":       { "type": "integer", "minimum": 1, "default": 180 }
+      }
+    },
+    "logging": {
+      "type": "object",
+      "properties": {
+        "level": { "type": "string", "enum": ["quiet", "normal", "verbose"], "default": "normal" },
+        "extra_mask_keys": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "show_fallback_badge": { "type": "boolean", "default": true }
+      }
+    },
+    "reports": {
+      "type": "object",
+      "properties": {
+        "task_report":  { "type": "boolean", "const": true },
+        "design_doc":   { "type": "boolean", "default": true },
+        "request_spec": { "type": "boolean", "default": true },
+        "daily":        { "type": "boolean", "default": true },
+        "weekly":       { "type": "boolean", "default": true },
+        "path_tasks":     { "type": "string", "default": "docs/reports/tasks" },
+        "path_daily":     { "type": "string", "default": "docs/reports/daily" },
+        "path_weekly":    { "type": "string", "default": "docs/reports/weekly" },
+        "path_design":    { "type": "string", "default": "docs/design" },
+        "path_requests":  { "type": "string", "default": "docs/requests" },
+        "path_transfer":  { "type": "string", "default": "docs/transfer" },
+        "language": {
+          "type": "string",
+          "enum": ["auto", "ko", "en"],
+          "default": "auto"
+        },
+        "transfer_scope_default": {
+          "type": "string",
+          "enum": ["project", "interactive"],
+          "default": "project"
+        },
+        "transfer_template": {
+          "type": "string",
+          "enum": ["standard", "brief"],
+          "default": "standard"
+        },
+        "transfer_include_devils_advocate_section": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "reuse_first": {
+      "type": "object",
+      "description": "Reuse-First 교차 원칙 장치 4개 토글. Cascade 규칙은 /ensembra:config 가 자동 처리.",
+      "properties": {
+        "device_1_inventory":        { "type": "boolean", "default": true },
+        "device_2_schema_field":     { "type": "boolean", "default": true },
+        "device_3_auto_disagree":    { "type": "boolean", "default": true },
+        "device_4_synthesis_report": { "type": "boolean", "default": true },
+        "quick_preset": {
+          "type": "string",
+          "enum": ["Maximum", "Strong", "Balanced", "Advisory", "Off", "Custom"],
+          "default": "Maximum"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "performerConfig": {
+      "type": "object",
+      "required": ["transport", "model"],
+      "properties": {
+        "transport": {
+          "type": "string",
+          "enum": ["claude-subagent", "gemini", "ollama"]
+        },
+        "model": { "type": "string" },
+        "endpoint": { "type": "string", "format": "uri" },
+        "timeout_sec": { "type": "integer", "minimum": 1 },
+        "enabled": { "type": "boolean", "default": true }
+      }
+    }
+  }
+}

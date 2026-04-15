@@ -1,0 +1,28 @@
+name: bugfix
+description: 버그 수정. planner+architect+developer+qa 참여, R1→Synthesis, qa+security 감사.
+
+performers:
+  - planner
+  - architect
+  - developer
+  - qa
+
+rounds: [R1, synthesis]
+
+deep_scan:
+  forced: [1, 2, 3, 4, 9, 10]
+  optional: [5, 6]  # 테스트·히스토리 중요, 의존성·설정은 off (빠른 진단)
+
+phase2:
+  execute: true
+
+phase3:
+  audit: true
+  auditors: [qa, security]  # 회귀·보안 중심
+
+phase4:
+  document: true
+  generate:
+    task_report: true
+    design_doc: false  # bugfix 는 설계서 대상 아님
+    request_spec: false

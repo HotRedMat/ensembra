@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/HotRedMat/ensembra/schemas/agent-input.json",
+  "title": "Ensembra Agent Input",
+  "description": "Performer 가 매 라운드 시작 시 받는 입력 JSON",
+  "type": "object",
+  "required": ["round", "problem", "role", "prior_outputs"],
+  "properties": {
+    "round": {
+      "type": "string",
+      "enum": ["R1", "R2", "R3", "synthesis", "audit"],
+      "description": "현재 라운드 유형"
+    },
+    "problem": {
+      "type": "string",
+      "description": "사용자가 제기한 원 문제. 파이프라인 내내 불변."
+    },
+    "role": {
+      "type": "string",
+      "enum": ["planner", "architect", "developer", "security", "qa", "devils-advocate", "scribe"],
+      "description": "이 Performer 의 역할 ID"
+    },
+    "prior_outputs": {
+      "type": "array",
+      "description": "이전 라운드의 모든 Performer 출력. R1 에서는 빈 배열.",
+      "items": {
+        "$ref": "agent-output.json"
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "description": "선택. 토큰 한도·금지 주제·참조 파일 등.",
+      "properties": {
+        "context_snapshot": {
+          "type": "string",
+          "description": "Phase 0 Deep Scan 결과 (Markdown). 모든 Performer 가 공유."
+        },
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "forbidden_topics": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "reference_files": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

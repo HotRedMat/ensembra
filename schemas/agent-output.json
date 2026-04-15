@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/HotRedMat/ensembra/schemas/agent-output.json",
+  "title": "Ensembra Agent Output",
+  "description": "Performer 가 매 라운드 반환하는 출력 JSON",
+  "type": "object",
+  "required": ["role", "round", "status", "summary"],
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": ["planner", "architect", "developer", "security", "qa", "devils-advocate", "scribe"]
+    },
+    "round": {
+      "type": "string",
+      "enum": ["R1", "R2", "R3", "synthesis", "audit"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["ok", "abstain", "error"]
+    },
+    "summary": {
+      "type": "string",
+      "description": "1~3 문장 핵심 주장 또는 섹션 요약"
+    },
+    "arguments": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "근거 bullet. status=ok 일 때 1개 이상 권장."
+    },
+    "risks": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "references": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path"],
+        "properties": {
+          "path": { "type": "string" },
+          "line": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "reuse_analysis": {
+      "type": "object",
+      "description": "Reuse-First 장치 2. R1 에서 장치 2 활성 시 필수.",
+      "required": ["inventory_checked", "reusable_candidates", "decision"],
+      "properties": {
+        "inventory_checked": {
+          "type": "boolean",
+          "description": "Performer 가 Context Snapshot 의 재사용 인벤토리를 실제로 읽었는지 자기 선언"
+        },
+        "reusable_candidates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "symbol"],
+            "properties": {
+              "path": { "type": "string" },
+              "symbol": { "type": "string" },
+              "why": { "type": "string" }
+            }
+          }
+        },
+        "decision": {
+          "type": "string",
+          "enum": ["reuse", "extend", "new"]
+        },
+        "new_creation_justified": {
+          "type": "string",
+          "description": "decision === 'new' 일 때 필수. 부실한 사유는 자동 disagree 트리거."
+        }
+      }
+    },
+    "peer_signatures": {
+      "type": "array",
+      "description": "R2 라운드에서 필수. 다른 Performer 에 대한 서명.",
+      "items": {
+        "type": "object",
+        "required": ["target_role", "vote"],
+        "properties": {
+          "target_role": {
+            "type": "string",
+            "enum": ["planner", "architect", "developer", "security", "qa", "devils-advocate"]
+          },
+          "vote": {
+            "type": "string",
+            "enum": ["agree", "disagree", "abstain"]
+          },
+          "note": { "type": "string" }
+        }
+      }
+    },
+    "phase": {
+      "type": "string",
+      "enum": ["deliberate", "audit"],
+      "description": "audit 모드에서는 'audit', 평상시는 생략 또는 'deliberate'"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["pass", "fail", "rework"],
+      "description": "Phase 3 Audit 에서만 사용"
+    },
+    "issues": {
+      "type": "array",
+      "description": "Phase 3 Audit 에서 발견된 문제",
+      "items": {
+        "type": "object",
+        "required": ["severity", "message"],
+        "properties": {
+          "severity": { "type": "string", "enum": ["high", "medium", "low"] },
+          "file": { "type": "string" },
+          "line": { "type": "integer", "minimum": 1 },
+          "message": { "type": "string" }
+        }
+      }
+    },
+    "requested_changes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Phase 3 Audit 에서 verdict=fail/rework 시 요구 변경"
+    },
+    "_error": {
+      "type": "object",
+      "description": "status=error 일 때만 존재",
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": ["timeout", "format", "schema-violation", "reuse-policy-violation", "transport-failure", "unknown"]
+        },
+        "message": { "type": "string" }
+      }
+    }
+  },
+  "additionalProperties": false
+}

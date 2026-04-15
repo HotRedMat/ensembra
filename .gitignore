@@ -7,6 +7,9 @@ Thumbs.db
 .vscode/
 *.swp
 
+# Claude Code local state (not part of plugin)
+.claude/settings.local.json
+
 # Logs
 *.log
 pnpm-debug.log*
