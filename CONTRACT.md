@@ -26,7 +26,7 @@ Performer 가 매 라운드 시작 시 받는 JSON.
   "properties": {
     "round": {
       "type": "string",
-      "enum": ["R1", "R2", "R3", "synthesis"]
+      "enum": ["R1", "R2", "R3", "synthesis", "audit"]
     },
     "problem": {
       "type": "string",
@@ -386,7 +386,7 @@ Health check 실패 시:
     "architect":       {"transport": "gemini",          "model": "gemini-2.0-flash"},
     "security":        {"transport": "ollama",          "model": "qwen2.5:14b"},
     "qa":              {"transport": "ollama",          "model": "llama3.1:8b"},
-    "devils-advocate": {"transport": "claude-subagent", "model": "sonnet"}
+    "devils-advocate": {"transport": "claude-subagent", "model": "haiku"}
   },
   "fallback": {
     "transport": "claude-subagent",
@@ -394,6 +394,11 @@ Health check 실패 시:
   }
 }
 ```
+
+**기본 모델표** (Q1 확정):
+- planner=opus / architect=gemini-2.0-flash / developer=sonnet / security=qwen2.5:14b / qa=llama3.1:8b / devils-advocate=**haiku** / scribe=sonnet
+
+주의: 위 §13.3 JSON 예시에는 `developer` 와 `scribe` 항목이 생략되어 있지만 실제 기본값은 포함된다. 예시는 차이 나는 항목만 보이기 위한 축약.
 
 파일 권한 권장: `chmod 600`. 시크릿은 포함되지 않지만 사용자 설정 노출 방지.
 

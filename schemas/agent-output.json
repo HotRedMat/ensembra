@@ -4,7 +4,8 @@
   "title": "Ensembra Agent Output",
   "description": "Performer 가 매 라운드 반환하는 출력 JSON",
   "type": "object",
-  "required": ["role", "round", "status", "summary"],
+  "required": ["role", "round", "status", "summary", "reuse_analysis"],
+  "description": "reuse_analysis 는 Reuse-First 장치 2 가 활성일 때 필수. 장치 2 가 비활성이면 런타임에서 조건부 required 해제 허용.",
   "properties": {
     "role": {
       "type": "string",
