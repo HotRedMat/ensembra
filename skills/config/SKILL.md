@@ -45,7 +45,7 @@ Ensembra 설정
 역할 7개 나열 → 선택 → 모델 picker (Live 조회):
 - Ollama: `Bash curl -s http://localhost:11434/api/tags` → `.models[].name`
 - Claude: 정적 목록 (opus/sonnet/haiku + 현재 세션 ID)
-- Gemini: **v0.6.0 에서 제거됨** (architect 기본 Transport 가 Ollama 로 이관). Gemini 옵션은 picker 에 노출하지 않음. Gate3 에서 MCP 기반 재도입 예정
+- Gemini: **v0.7.0 에서 MCP 기반 재도입**. `settings.local.json` 에 `mcpServers.gemini-architect` 등록 여부로 가용성 판단. 키는 `/plugin → ensembra → Configure options` 에서 설정 (sensitive:true, picker 가 직접 접근하지 않음)
 숫자 입력으로 선택.
 
 ### (2) Presets
@@ -72,13 +72,21 @@ Ensembra 설정
 - a) Ollama endpoint (기본 `http://localhost:11434`)
 - b) Ollama health check → `curl -s /api/tags`
 - c) Claude 폴백 모델 선택
+- d) Gemini MCP 상태 확인 → `settings.local.json` 에 `mcpServers.gemini-architect` 등록 여부 표시 + MCP server health check
 
 #### (5)c Claude 폴백 모델
 Ollama 불가 시 architect/security/qa 가 사용할 Claude 모델 선택 (opus/sonnet/haiku).
 
-#### Gemini (v0.6.0 에서 제거)
+#### (5)d Gemini MCP 상태 확인 (v0.7.0 복원)
 
-v0.5.x 까지 (5)c 는 Gemini API key 상태 표시 + (5)d 는 Gemini health check 이었다. v0.6.0 은 Gemini 경로 전체를 폐지했으므로 picker 에서도 제거. `gemini_api_key` userConfig 필드는 `sensitive: true` 로 선언만 유지되며 picker 는 이 값을 **절대 건드리지 않는다** (읽기·쓰기·길이 확인 모두 금지). 상세 이유는 `SECURITY.md` 및 `CONTRACT.md §8.4` 참조. Gate3 MCP 재도입 시 이 섹션을 복원한다.
+v0.6.0 에서 제거되었던 Gemini 서브메뉴가 v0.7.0 에서 MCP 기반으로 복원됨.
+
+표시 항목:
+- `settings.local.json` 에 `mcpServers.gemini-architect` 등록 여부 (등록됨/미등록)
+- MCP server 프로세스 가동 여부 (가동 중/미가동)
+- API 키 설정 여부: **`gemini_api_key` 값 자체를 읽지 않고**, MCP server 에 health check 호출을 보내 간접 확인
+
+**불변식**: picker 는 `gemini_api_key` 를 **절대 읽지·쓰지·길이 측정도 하지 않는다**. 키 설정은 `/plugin → ensembra → Configure options` 에서만 가능.
 
 ### (6) Timeouts
 Ollama/Gemini/Claude-subagent/Deep-Scan 각각 초 단위.
@@ -191,9 +199,8 @@ Ensembra > Plan Tier
 ## 스키마 참조
 `schemas/config.json` 의 JSON Schema 를 준수. 저장 시 스키마 검증 수행.
 
-## 보안 (v0.6.0+)
+## 보안 (v0.7.0+)
 - **이 스킬은 `gemini_api_key` 를 절대 읽지·쓰지·길이 측정도 하지 않는다** (v0.5.x 의 치환 기반 노출 경로 재현 방지)
-- Gemini 경로 전체가 v0.6.0 에서 폐지됨 — architect 기본 Transport 는 Ollama
+- v0.7.0 에서 Gemini 가 MCP server 기반으로 재도입됨 — 키는 MCP server 프로세스 env 로만 전달, skill/agent content 미노출
 - `config.json` 에는 시크릿 포함 금지 — 모든 시크릿은 Claude Code `userConfig` + OS 키체인에 위임
 - `SECURITY.md` 마스킹 규칙 준수 — 로그·보고서에서 `x-goog-api-key`, `key=`, `GEMINI_API_KEY`, `CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY`, `user_config.gemini_api_key` 모두 `[REDACTED]`
-- Gate3 MCP 재도입 시점에 이 섹션을 재검토

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/HotRedMat/ensembra/releases"><img src="https://img.shields.io/badge/version-0.5.1-blue" alt="version"/></a>
+  <a href="https://github.com/HotRedMat/ensembra/releases"><img src="https://img.shields.io/badge/version-0.7.0-blue" alt="version"/></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="license"/></a>
   <img src="https://img.shields.io/badge/plugin%20validate-passing-brightgreen" alt="plugin validate"/>
   <img src="https://img.shields.io/badge/verification-end--to--end-brightgreen" alt="verification"/>
@@ -62,7 +62,7 @@ Phase 4 Document   — scribe records Task / Design / Request / Daily / Weekly
 | Role | Responsibility | Default Transport | Default Model |
 |---|---|---|---|
 | 🧭 **planner** | Requirements, acceptance criteria | Claude sub-agent | `opus` |
-| 🏛 **architect** | Module boundaries, patterns | Ollama | `qwen2.5:14b` |
+| 🏛 **architect** | Module boundaries, patterns | MCP (Gemini) → Ollama → Claude | `gemini-2.5-flash` |
 | 🛠 **developer** | Implementation strategy | Claude sub-agent | `sonnet` |
 | 🛡 **security** | Threats, secrets, OWASP | Ollama | `qwen2.5:14b` |
 | 🧪 **qa** | Edge cases, regression | Ollama | `llama3.1:8b` |
@@ -111,21 +111,14 @@ claude plugin install ensembra@ensembra
 ollama pull qwen2.5:14b llama3.1:8b
 ```
 
-### Ollama setup for architect (v0.6.0+)
+### Gemini setup for architect (v0.7.0+, optional)
 
-The architect Performer uses Ollama (`qwen2.5:14b`) by default as of v0.6.0. Pull the model:
+The architect Performer uses Gemini via MCP server as the primary transport. The MCP server is **automatically registered** when the plugin is installed (`plugin.json` declares `mcpServers`). To enable:
 
-```bash
-ollama pull qwen2.5:14b
-```
+1. Set API key: `/plugin → ensembra → Configure options`
+2. `/reload-plugins`
 
-If Ollama is not running (or the model is missing), architect falls back to a Claude sub-agent automatically — Ensembra works fully without Ollama.
-
-### Gemini (removed in v0.6.0)
-
-v0.5.x shipped Gemini as the default architect Transport via a `sensitive: false` userConfig field that substituted the API key into skill content. Testing showed this substitution flows into the session system prompt and thus into `~/.claude/projects/**.jsonl` on every pipeline invocation — a structural key leak that two manual rotations failed to contain. **v0.6.0 removes the Gemini path entirely** and restores the `sensitive: true` invariant.
-
-The `gemini_api_key` field remains declared in `plugin.json` but is **unused by the current pipeline**. It is reserved for a future Gate3 re-integration in which architect would be re-implemented as an MCP server or hook command — the only contexts where sensitive userConfig values are safely accessible. See [`SECURITY.md`](./SECURITY.md) and `CHANGELOG.md [0.6.0]` for the full postmortem.
+That's it — no manual `settings.local.json` editing needed. If Gemini is unavailable (no key set, API error), architect falls back to Ollama (`qwen2.5:14b`), then to a Claude sub-agent — Ensembra works fully without Gemini or Ollama. The API key is stored securely in the OS keychain (`sensitive: true`) and passed only to the MCP server process env — never exposed in skill/agent content or session logs. See [`SECURITY.md`](./SECURITY.md) and `CHANGELOG.md [0.7.0]` for details.
 
 ## Reuse-First Policy
 

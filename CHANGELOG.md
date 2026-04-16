@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-04-16
+
+### Added
+
+- **MCP server 기반 Gemini architect 재도입** (Gate3 충족). `mcp-servers/gemini-architect/server.py` — Python 3 표준 라이브러리만 사용하는 stdio MCP server. `GEMINI_API_KEY` 를 프로세스 환경변수로만 받아 Gemini REST API 호출. `sensitive: true` 불변식 유지.
+  - Gate3 전제조건 3가지 충족: (1) architect 를 MCP server 로 이전, (2) MCP server config 에서만 sensitive 치환, (3) skill/agent content 는 결과만 참조
+- **`transport: "mcp"` 추가** — `schemas/config.json` 의 `performerConfig.transport` enum 에 `mcp` 추가 + `mcp_server_name` 필드 신설
+- **LLM 호출 배지 규약** — Phase 1 시작 시 각 Performer 의 Transport/Model 현황을 `📡` 배지로 출력 (`CONTRACT.md §8.6`). `config.json logging.show_transport_badge` 로 토글 가능
+
+### Changed
+
+- **architect Transport**: Ollama 단독 → MCP(Gemini) → Ollama → Claude 3단 폴백 체인
+  - `agents/architect.md`: Transport 섹션 전면 재작성
+  - `agents/orchestrator.md`: Performer 풀 architect 행 갱신 + LLM 호출 배지 출력 의무 추가
+  - `skills/run/SKILL.md`: Transport 호출 규약 MCP 분기 추가 + 배지 규약 추가
+- `.claude-plugin/plugin.json`: `version` 0.6.0 → 0.7.0, `gemini_api_key` title/description MCP 재도입 반영
+- `CONTRACT.md`:
+  - §8.1 Transport 테이블에 `mcp` 행 추가
+  - §8.2 Performer 레지스트리에 `mcp` transport 설명 추가
+  - §8.4 "Gemini 폐지" → "MCP 기반 Gemini 재도입" 으로 전면 재작성
+  - §8.5 MCP Transport 호출 규약 신설
+  - §8.6 LLM 호출 배지 규약 신설
+  - §8.5 (기존 라운드 피로도 대응) → §8.7 로 번호 이동
+- `SECURITY.md`: v0.7.0 위협 모델 갱신. MCP server stdout 역류 방지 섹션 추가. Gate3 충족 현황 갱신
+- `skills/config/SKILL.md`: (5) Transports 에 Gemini MCP 상태 확인 서브메뉴 복원
+
+### Migration
+
+1. 플러그인 업데이트: `plugin.json` 의 `mcpServers` 필드로 MCP server 가 **자동 등록** 됨 (수동 `settings.local.json` 편집 불필요)
+2. Gemini API 키 설정: `/plugin → ensembra → Configure options` 에서 키 입력
+3. `/reload-plugins` 실행
+4. 키 미설정 시 기존처럼 Ollama → Claude 폴백으로 동작 (행동 변화 없음)
+
 ## [0.6.0] — 2026-04-16
 
 ### Security (critical — closes structural Gemini key leak)
@@ -403,7 +436,9 @@ If you never set up an env file, no action needed — just `claude plugin update
 - Ensembra itself needs installation on a real project to test the full pipeline
 - Ollama and Gemini API key setup must be done manually before first use
 
-[Unreleased]: https://github.com/HotRedMat/ensembra/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/HotRedMat/ensembra/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/HotRedMat/ensembra/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/HotRedMat/ensembra/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/HotRedMat/ensembra/releases/tag/v0.5.1
 [0.5.0]: https://github.com/HotRedMat/ensembra/releases/tag/v0.5.0
 [0.4.1]: https://github.com/HotRedMat/ensembra/releases/tag/v0.4.1

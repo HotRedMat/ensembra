@@ -1,6 +1,6 @@
 {
   "name": "ensembra",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Multi-agent orchestrator plugin for Claude Code — agents perform in concert through a 5-phase pipeline (Gather → Deliberate → Execute → Audit → Document) with Reuse-First cross-cutting policy.",
   "author": {
     "name": "Seungho Lee",
@@ -18,11 +18,20 @@
     "reuse-first",
     "handover"
   ],
+  "mcpServers": {
+    "gemini-architect": {
+      "command": "python3",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp-servers/gemini-architect/server.py"],
+      "env": {
+        "GEMINI_API_KEY": "${user_config.gemini_api_key}"
+      }
+    }
+  },
   "userConfig": {
     "gemini_api_key": {
       "type": "string",
-      "title": "Gemini API key (optional — architect uses Ollama by default in v0.6.0+)",
-      "description": "Google AI Studio API key. In v0.6.0+ the architect performer defaults to Ollama (qwen2.5:14b); Gemini is not required. This field is reserved for future MCP-based Gemini integration. Leave blank. Stored as a sensitive value in the OS keychain (not accessible from skill/agent content — this is the security invariant that v0.6.0 restored).",
+      "title": "Gemini API key (used by MCP server for architect transport in v0.7.0+)",
+      "description": "Google AI Studio API key. In v0.7.0+ this key is passed to the ensembra-gemini-architect MCP server via env var — skill/agent content never sees it (sensitive:true invariant). Set via /plugin → ensembra → Configure options. Used when architect transport is configured as 'mcp'.",
       "sensitive": true
     },
     "ollama_endpoint": {

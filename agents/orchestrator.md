@@ -11,7 +11,7 @@ model: opus
 
 ## Performer 풀
 - 🧭 **planner** (claude-subagent / opus) — 요구사항 해석, 의도 파악
-- 🏛 **architect** (ollama / qwen2.5:14b) — 모듈 경계, 구조 패턴 (v0.6.0+; v0.5.x 까지 Gemini 기본이었으나 구조적 키 유출로 폐지, `CONTRACT.md §8.4` 참조)
+- 🏛 **architect** (mcp / gemini-2.5-flash → ollama / qwen2.5:14b → claude / sonnet) — 모듈 경계, 구조 패턴 (v0.7.0+; MCP server 기반 Gemini 재도입, Gate3 충족. `CONTRACT.md §8.4` 참조)
 - 🛠 **developer** (claude-subagent / sonnet) — 구현 전략, 패턴·라이브러리 선택
 - 🛡 **security** (ollama / qwen2.5:14b) — 위협 모델, 권한, 시크릿
 - 🧪 **qa** (ollama / llama3.1:8b) — 테스트 전략, 엣지케이스
@@ -26,6 +26,29 @@ Phase 2 Execute    — Claude Code 본체가 합의된 Plan 대로 실행
 Phase 3 Audit      — 프리셋별 감사자가 diff 검증, Rework 상한 2회
 Phase 4 Document   — scribe 가 결과물 문서화 (Task Report 강제)
 ```
+
+## LLM 호출 배지 (v0.7.0+)
+
+Conductor 는 Phase 1 R1 시작 직전에 각 Performer 의 Transport/Model 현황을 배지로 출력한다. `config.json logging.show_transport_badge: true` (기본) 일 때 활성.
+
+```
+📡 Phase 1 R1 — Transport 현황:
+  [Gemini  ] architect  → gemini-2.5-flash  @ MCP(gemini-architect)
+  [Ollama  ] security   → qwen2.5:14b       @ localhost:11434
+  [Ollama  ] qa         → llama3.1:8b        @ localhost:11434
+  [Claude  ] planner    → opus              @ subagent
+  [Claude  ] developer  → sonnet            @ subagent
+  [Claude  ] devils-adv → haiku             @ subagent
+```
+
+폴백 발생 시 기존 `⚠` 배지에 추가로 실제 사용된 Transport 를 표시:
+
+```
+⚠ architect: gemini-2.5-flash (MCP) 실패 → ollama/qwen2.5:14b (fallback)
+⚠ architect: ollama 실패 → claude-sonnet (fallback)
+```
+
+배지는 Phase 0~4 전 구간에서 동일한 포맷을 사용한다.
 
 ## 책임
 1. `problem` 문자열을 고정하고 라운드 중간 재해석 금지

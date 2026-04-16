@@ -199,8 +199,9 @@ Performer 는 이종(heterogeneous) 이다. Conductor 는 각 Performer 의 `tra
 
 | Transport | 대상 | 호출 방식 | 시크릿 |
 |---|---|---|---|
+| `mcp` | MCP stdio server | Claude Code MCP tool-use (JSON-RPC 2.0 over stdin/stdout) | MCP server env var (skill content 미노출) |
 | `ollama` | 로컬 Ollama | `POST http://localhost:11434/api/chat`, `"stream": false` | 없음 |
-| `gemini` | Google Gemini 공식 API | `POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent` | `GEMINI_API_KEY` |
+| `gemini` | Google Gemini 공식 API (레거시, v0.6.0 폐지) | `POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent` | `GEMINI_API_KEY` (⚠ skill content 유출) |
 | `claude-subagent` | Claude Code 내장 서브에이전트 | in-process (Claude Code 가 자동 처리) | 없음 (세션 토큰) |
 
 `chatgpt-web`, `gemini-web` 등 웹 UI 스크래핑 기반 transport 는 **명시적으로 제외**한다. ToS 위반 및 유지보수 취성 사유.
@@ -219,7 +220,8 @@ Performer 는 이종(heterogeneous) 이다. Conductor 는 각 Performer 의 `tra
 }
 ```
 
-- `transport: "gemini"` 일 때는 `endpoint` 대신 `model` 만 지정 (예: `gemini-2.5-flash`).
+- `transport: "mcp"` 일 때는 `mcp_server_name` 필수 (예: `"gemini-architect"`). `model` 은 MCP tool 인자로 전달.
+- `transport: "gemini"` 은 레거시 (v0.6.0 폐지). 신규 사용 금지 — `mcp` transport 를 사용하라.
 - `transport: "claude-subagent"` 일 때는 `model` 에 Claude 모델(`opus`/`sonnet`/`haiku`) + `agent_name` 으로 `.claude/agents/*.md` 의 `name` 참조.
 
 ### 8.3 외부 LLM 응답 파싱 계약
@@ -237,33 +239,50 @@ Performer 는 이종(heterogeneous) 이다. Conductor 는 각 Performer 의 `tra
 3. 블록이 없거나 JSON 파싱 실패 시 Performer 출력을 `status: "error"`, `_error.code: "format"` 로 마킹. §5 에러 규약에 따름.
 4. 자연어 서술은 절대 Conductor 가 재정리하지 않는다. `summary`, `arguments` 는 Performer 가 선언한 그대로 보존.
 
-### 8.4 Architect Transport 및 Gemini 폐지 (v0.6.0+)
+### 8.4 Architect Transport — MCP 기반 Gemini 재도입 (v0.7.0+)
 
-**배경**: v0.5.1 은 `gemini_api_key.sensitive: false` 로 선언해 skill/agent content 에서 `${user_config.gemini_api_key}` 치환이 작동하도록 했다. 그러나 이 치환은 **스킬 호출 시 시스템 프롬프트로 주입** 되어, 매 `/ensembra:run` 실행마다 세션 로그(`~/.claude/projects/.../*.jsonl`)와 화면 트랜스크립트에 키가 평문으로 기록되는 구조적 유출이 확인됨. v0.5.1 의 SECURITY.md 는 이 위험을 residual risk 로만 기록했지만, 실측 결과 "residual" 이 아니라 "매 호출마다 필연" 에 가까웠다.
+**이력**:
+- v0.5.1: `sensitive: false` + skill content 치환 → 매 실행마다 세션 로그에 키 평문 유출 (구조적 결함)
+- v0.6.0: Gemini 폐지, Ollama 이관, `sensitive: true` 복구
+- **v0.7.0: MCP server 기반 Gemini 재도입** — Gate3 전제조건 3가지 충족
 
-**v0.6.0 결정**: Gemini 경로를 폐지하고 architect 를 **Ollama(qwen2.5:14b)** 로 이전. `sensitive: true` 불변식 복구.
+**Gate3 전제조건 충족 현황**:
+1. ✅ architect Performer 를 **MCP server** (`mcp-servers/gemini-architect/server.py`) 로 이전
+2. ✅ `sensitive: true` 값은 MCP server config 의 `env.GEMINI_API_KEY` 로만 접근 (skill/agent content 미노출)
+3. ✅ skill/agent content 는 MCP tool 호출 결과만 참조, 키 직접 참조 없음
 
-**이동 후 architect Transport**:
-- 기본: `ollama` / `qwen2.5:14b` (로컬 HTTP, 시크릿 불필요)
-- 엔드포인트: `${user_config.ollama_endpoint}` (비시크릿 — 치환 가능)
-- 폴백: Ollama 가용 실패 시 Claude 서브에이전트(`sonnet`)
+**v0.7.0 architect Transport 3단 폴백 체인**:
 
-**호출 예시** (v0.6.0+):
-```bash
-curl -s -X POST "${user_config.ollama_endpoint}/api/generate" \
-  -H 'Content-Type: application/json' \
-  -d "{\"model\":\"qwen2.5:14b\",\"prompt\":\"$prompt\",\"stream\":false}"
+```
+1. MCP(gemini-architect) — GEMINI_API_KEY 설정 + MCP server 응답 시
+   └─ tool: architect_deliberate(prompt, model, timeout_sec)
+   └─ 실패 시 → 2번으로 폴백
+
+2. Ollama(qwen2.5:14b) — localhost:11434 응답 시
+   └─ curl POST /api/generate
+   └─ 실패 시 → 3번으로 폴백
+
+3. Claude(sonnet) — 최종 폴백 (항상 가용)
+   └─ in-process 서브에이전트
 ```
 
-**gemini_api_key 필드의 운명**:
-- `plugin.json` 의 `userConfig.gemini_api_key` 는 **선언은 유지** (향후 MCP 기반 Gemini 재도입을 위해) 하되 `sensitive: true` 로 복구
-- 스킬·에이전트 본문에서 `${user_config.gemini_api_key}` 참조는 **모두 제거**
-- 사용자가 키를 입력하더라도 v0.6.0 파이프라인은 사용하지 않음 (데이터는 OS 키체인에 남되 Ensembra 는 접근하지 않음)
+**MCP server 등록**: `plugin.json` 의 `mcpServers` 필드에 선언되어 플러그인 설치 시 **자동 등록** 된다:
+```json
+"mcpServers": {
+  "gemini-architect": {
+    "command": "python3",
+    "args": ["${CLAUDE_PLUGIN_ROOT}/mcp-servers/gemini-architect/server.py"],
+    "env": {
+      "GEMINI_API_KEY": "${user_config.gemini_api_key}"
+    }
+  }
+}
+```
+`${CLAUDE_PLUGIN_ROOT}` 는 Claude Code 가 플러그인 설치 경로로 자동 치환한다. 사용자가 `settings.local.json` 을 수동 편집할 필요 없음.
 
-**Gemini 재도입 전제** (Gate3 이월):
-1. architect Performer 를 **MCP server** 또는 **hook command** 로 이전
-2. `sensitive: true` 값이 접근 가능한 컨텍스트(MCP server config, hook env var `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY`) 에서만 Gemini 호출
-3. skill/agent content 는 architect 호출 결과만 참조하고 키는 절대 만지지 않음
+**`sensitive: true` 불변식 유지**: `gemini_api_key` 는 OS 키체인에 저장, MCP server config 의 `${user_config.gemini_api_key}` 치환으로만 프로세스 env 에 전달. skill/agent content, 시스템 프롬프트, 세션 로그에 키가 노출되지 않음.
+
+**gemini Transport (레거시)**: v0.6.0 에서 폐지된 `transport: "gemini"` 은 하위 호환을 위해 스키마에 남되 **신규 사용 금지**. `transport: "mcp"` + `mcp_server_name: "gemini-architect"` 를 사용하라.
 
 **로그 마스킹**: `x-goog-api-key`, `Authorization`, `key=`, `CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY`, `user_config.gemini_api_key`, `GEMINI_API_KEY` 전부 `[REDACTED]` (v0.5.x 관례 유지)
 
@@ -287,7 +306,42 @@ curl -s -X POST "${user_config.ollama_endpoint}/api/generate" \
 2. `/plugin → ensembra → Configure options` 에서 키 재설정
 3. `/reload-plugins`
 
-### 8.5 라운드 피로도 대응
+### 8.5 MCP Transport 호출 규약
+
+`transport: "mcp"` 인 Performer 호출 시:
+
+1. Conductor 는 MCP tool-use 를 통해 해당 MCP server 의 tool 을 호출한다
+2. MCP server 는 외부 API 호출 후 결과를 `content[].text` 로 반환
+3. Conductor 는 반환된 텍스트에서 `===ENSEMBRA-OUTPUT===` 블록을 추출 (§8.3 동일)
+4. MCP tool 의 `isError: true` 응답 시 `transport-failure` 로 마킹, 폴백 체인 진행
+
+**Health Check**: Phase 0 직전에 MCP server 가용 여부를 확인한다. MCP tool-use 호출이 가능한지 Claude Code 에 위임. 불가 시 즉시 다음 폴백으로 전환하고 배지 출력.
+
+### 8.6 LLM 호출 배지 규약 (v0.7.0+)
+
+Conductor 는 `config.json logging.show_transport_badge: true` (기본) 일 때 외부 LLM 호출 현황을 배지로 출력한다.
+
+**Phase 1 시작 시**: 전체 Performer 의 Transport/Model 계획을 한 번에 표시.
+
+```
+📡 Phase 1 R1 — Transport 현황:
+  [Gemini  ] architect  → gemini-2.5-flash  @ MCP(gemini-architect)
+  [Ollama  ] security   → qwen2.5:14b       @ localhost:11434
+  [Ollama  ] qa         → llama3.1:8b        @ localhost:11434
+  [Claude  ] planner    → opus              @ subagent
+  [Claude  ] developer  → sonnet            @ subagent
+  [Claude  ] devils-adv → haiku             @ subagent
+```
+
+**폴백 발생 시**: 기존 `⚠` 배지에 실제 사용된 Transport 를 추가.
+
+```
+⚠ architect: gemini-2.5-flash (MCP) 실패 → ollama/qwen2.5:14b (fallback)
+```
+
+**배지 금지 항목**: 배지에 API 키, Authorization 헤더, 인증 토큰은 절대 포함하지 않는다. 모델명 + endpoint 호스트명만 표시.
+
+### 8.7 라운드 피로도 대응
 
 Ollama 는 즉시 응답하지만 Gemini 무료 티어는 분당 15 요청 제한이 있다. Conductor 는:
 - 같은 라운드 내 Performer 호출을 Transport 별로 그룹화해 병렬 실행 (ollama·gemini·claude-subagent 는 상호 독립)

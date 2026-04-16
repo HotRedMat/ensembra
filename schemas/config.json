@@ -101,7 +101,8 @@
           "items": { "type": "string" },
           "default": []
         },
-        "show_fallback_badge": { "type": "boolean", "default": true }
+        "show_fallback_badge": { "type": "boolean", "default": true },
+        "show_transport_badge": { "type": "boolean", "default": true, "description": "Phase 1 시작 시 각 Performer 의 Transport/Model 배지를 출력한다." }
       }
     },
     "reports": {
@@ -162,7 +163,11 @@
       "properties": {
         "transport": {
           "type": "string",
-          "enum": ["claude-subagent", "gemini", "ollama"]
+          "enum": ["claude-subagent", "gemini", "ollama", "mcp"]
+        },
+        "mcp_server_name": {
+          "type": "string",
+          "description": "MCP server 이름 (transport=mcp 일 때 필수). settings.local.json mcpServers 키와 일치해야 한다."
         },
         "model": { "type": "string" },
         "endpoint": { "type": "string", "format": "uri" },

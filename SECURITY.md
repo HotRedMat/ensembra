@@ -2,50 +2,62 @@
 
 ## 시크릿 취급 정책 (Q5, Q7 결정 반영)
 
-**v0.6.0 핵심 원칙**: Ensembra 파이프라인은 시크릿을 **요구하지 않는다**. 기본 구성에서 architect 는 로컬 Ollama 를, 나머지 Performer 는 Claude 세션 토큰(자동) 또는 로컬 Ollama 를 사용한다. 외부 API 키가 필요한 Performer 는 **없다**.
+**v0.7.0 핵심 원칙**: Ensembra 파이프라인은 시크릿을 skill/agent content 에 **노출하지 않는다**. architect 는 MCP server(`gemini-architect`) 를 통해 Gemini 를 호출하며, API 키는 MCP server 프로세스 환경변수로만 전달된다. 나머지 Performer 는 Claude 세션 토큰(자동) 또는 로컬 Ollama 를 사용한다.
 
-## Gemini API 키 취급 (v0.6.0+)
+## Gemini API 키 취급 (v0.7.0+)
 
-**결론**: v0.6.0 은 Gemini 경로를 폐지했다. `userConfig.gemini_api_key` 필드는 선언만 남아있고(`sensitive: true`), 파이프라인은 이 값을 참조하지 않는다.
+**결론**: v0.7.0 은 MCP server 기반으로 Gemini 를 재도입했다. `userConfig.gemini_api_key` 는 `sensitive: true` 를 유지하며, MCP server 프로세스 환경변수(`GEMINI_API_KEY`)로만 전달된다. skill/agent content 에는 절대 노출되지 않는다.
 
-### 왜 폐지했는가 — 구조적 유출
+### 보안 이력
 
-v0.5.1 은 `sensitive: false` 로 선언하여 `${user_config.gemini_api_key}` 가 skill/agent content 에서 치환되도록 했다. Claude Code 는 스킬 호출 시 이 치환 결과를 **시스템 프롬프트** 에 주입하며, 시스템 프롬프트는 자동으로 `~/.claude/projects/.../*.jsonl` 세션 로그와 화면 트랜스크립트에 기록된다. 결과적으로 매 `/ensembra:run` 실행이 키를 평문으로 재유출하는 구조였다. v0.5.1 의 residual risk 로 기록된 위험이 실측상 "매 호출마다 필연"이라 판명되어 v0.6.0 에서 구조적으로 제거.
+- v0.5.1: `sensitive: false` → skill content 치환 → 시스템 프롬프트 주입 → 세션 로그 평문 유출 (**구조적 결함**)
+- v0.6.0: Gemini 폐지 + `sensitive: true` 복구 + Ollama 이관
+- **v0.7.0**: MCP server 기반 Gemini 재도입 — Gate3 전제조건 3가지 모두 충족
 
-### v0.6.0 의 architect 이관
+### v0.7.0 의 MCP 기반 architect
 
-- **기본 Transport**: `ollama` / `qwen2.5:14b` (`${user_config.ollama_endpoint}` 는 비시크릿이라 치환 가능·유출 무관)
-- **폴백**: Ollama 미가용 시 Claude 서브에이전트(`sonnet`)
-- **Gemini**: 파이프라인 기본 경로에서 제거. 사용자가 키를 입력해도 Ensembra 는 사용하지 않음
+- **기본 Transport**: MCP server (`mcp-servers/gemini-architect/server.py`)
+- **키 전달 경로**: `plugin.json userConfig` → OS 키체인 → `settings.local.json mcpServers.env.GEMINI_API_KEY` (`${user_config.gemini_api_key}` 치환) → MCP server 프로세스 env
+- **폴백 체인**: MCP(Gemini) → Ollama(qwen2.5:14b) → Claude(sonnet)
+- **skill/agent content**: MCP tool 호출 결과만 참조. 키 직접 참조 없음
 
 ### gemini_api_key 필드의 현재 역할
 
 - `plugin.json` 에 `type: "string"`, `sensitive: true` 로 선언
 - Claude Code 는 이 값을 **OS 키체인** (macOS Keychain 또는 `~/.claude/.credentials.json`) 에 저장
 - skill/agent content 에서 접근 시 `[sensitive option 'gemini_api_key' not available in skill content]` placeholder 치환 — **이것이 의도된 불변식**
-- 향후 MCP server / hook 기반 architect 재도입 시점에 사용 예정 (Gate3 이월)
+- MCP server config 에서 `${user_config.gemini_api_key}` 치환으로 프로세스 env 에 전달
 
-### Gemini 재도입 전제 (Gate3)
+### Gate3 전제조건 충족 현황
 
-1. architect Performer 를 MCP server 또는 hook command 로 이전
-2. 해당 컨텍스트에서만 `$CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY` 또는 MCP server config 치환으로 키 접근
-3. skill/agent content 는 architect 호출 결과만 참조하고 키를 직접 만지지 않음
+1. ✅ architect Performer 를 MCP server 로 이전 (`mcp-servers/gemini-architect/server.py`)
+2. ✅ MCP server config 치환으로만 키 접근 (`settings.local.json mcpServers.env`)
+3. ✅ skill/agent content 는 architect MCP tool 호출 결과만 참조
 
-## 위협 모델 (v0.6.0)
+### MCP server stdout 역류 방지
+
+MCP server 의 응답에 API 키가 포함되지 않도록:
+- `server.py` 의 에러 메시지에 키 포함 금지 (`RuntimeError` 에 HTTP 상태 코드만 포함)
+- Gemini API 에러 응답의 요청 echo 를 파싱하지 않고 상태 코드만 반환
+- MCP server 디버그 출력은 stderr 로만 전송 (stdout = Claude Code 통신 채널)
+
+## 위협 모델 (v0.7.0)
 
 **보호**:
 - skill/agent content 를 통한 시크릿 유출 경로 **구조적 제거** (`sensitive: true` 불변식)
+- MCP server 프로세스 env 로만 키 전달 — 세션 로그·시스템 프롬프트 미기록
+- MCP server stdout 역류 방지 — 에러 메시지에 키 미포함
 - 로컬 Ollama 는 네트워크에 시크릿을 전송하지 않음
 - 레포·git 에 커밋되지 않음 (`~/.claude/` 는 사용자 홈 디렉토리)
 
 **완화되지 않는 위험**:
-- 사용자가 다른 용도(수동 curl, 개인 스크립트)로 Gemini 키를 사용하다 로그에 남기는 경우 → Ensembra 책임 범위 외
+- MCP server 프로세스 환경변수가 `ps aux` 또는 `/proc/PID/environ` 으로 로컬 접근 가능 → Unix 공통 위협, Ensembra 책임 범위 외
 - 사용자가 `settings.json` 또는 OS 키체인 백업을 공유하는 경우 → Unix 공통 위협
 
-**완화 권장**:
-- 현재 Ensembra 만 쓴다면 `userConfig.gemini_api_key` 는 **빈 값**으로 유지
-- 키가 이미 설치돼 있다면 `/plugin → ensembra → Configure options` 에서 삭제 후 `/reload-plugins`
-- Gate3 전까지 Gemini 기능이 필요하면 Ensembra 외부에서 직접 호출
+**설정 권장**:
+- `/plugin → ensembra → Configure options` 에서 Gemini API 키 설정
+- MCP server 가 자동으로 키를 env 로 받아 사용
+- 키 미설정 시 MCP server 가 graceful 에러 반환 → Ollama/Claude 로 폴백
 
 ## v0.6.0 가 되돌린 경로
 
