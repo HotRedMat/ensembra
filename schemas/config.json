@@ -138,7 +138,40 @@
         "item_7_dependencies":     { "type": "boolean", "default": true },
         "item_8_configuration":    { "type": "boolean", "default": true },
         "item_9_reuse_inventory":  { "type": "boolean", "const": true },
-        "item_10_docs_inventory":  { "type": "boolean", "const": true }
+        "item_10_docs_inventory":  { "type": "boolean", "const": true },
+        "cache_enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "v0.9.2+. Phase 0 Deep Scan 결과를 .ensembra/cache/ 에 저장해 같은 프로젝트·같은 요청 해시 반복 실행 시 재사용. git HEAD 해시 변경 시 자동 무효화. CONTRACT.md §20 참조."
+        },
+        "cache_ttl_hours": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 72,
+          "default": 6,
+          "description": "v0.9.2+. Deep Scan 캐시 유효 시간(시간). 기본 6시간. git HEAD 해시가 바뀌면 TTL 과 무관하게 무효화."
+        },
+        "cache_path": {
+          "type": "string",
+          "default": ".ensembra/cache",
+          "description": "v0.9.2+. Deep Scan 캐시 저장 디렉토리. 프로젝트 루트 기준 상대 경로. .gitignore 에 추가 권장."
+        }
+      }
+    },
+    "pre_flight": {
+      "type": "object",
+      "description": "v0.9.2+. Ensembra Pre-flight Bailout 설정. Stage A Triage 가 ensembra_needed=false 판정 시 Phase 0 진입 없이 사용자 안내로 종료.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Pre-flight Bailout 활성화. false 면 항상 Phase 0 진입 (기존 v0.9.1 동작)."
+        },
+        "auto_bailout": {
+          "type": "boolean",
+          "default": false,
+          "description": "ensembra_needed=false 판정 시 사용자 확인 없이 자동 종료. 기본 false (사용자에게 '진행하시겠습니까?' 프롬프트)."
+        }
       }
     },
     "transports": {

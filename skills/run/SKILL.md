@@ -84,9 +84,14 @@ Conductor 는 프로파일 확정 시 배지 출력:
 💎 profile: max-plan  (transport=Claude priority, audit=전원, output=100%, final-auditor=opus)
 ```
 
-## Risk Routing — Stage A (요청 Triage, v0.9.0+)
+## Pre-flight Bailout + Risk Routing — Stage A (요청 Triage, v0.9.0+ / v0.9.2 확장)
 
-`risk_routing.enabled: true` (기본) 일 때, 사용자 입력을 Phase 0 진입 **이전** 에 Gemini flash 로 분류해 preset/profile 초기 제안을 수립한다.
+`risk_routing.enabled: true` (기본) 일 때, 사용자 입력을 Phase 0 진입 **이전** 에 Gemini flash 로 분류한다. v0.9.2+ 에서 이 단계는 **두 역할**을 동시에 수행한다:
+
+1. **Pre-flight Bailout** (v0.9.2+): 이 요청이 Ensembra multi-agent 토론 가치가 있는지 판정. `ensembra_needed: false` 면 Phase 0 진입 없이 종료 → Claude Code 컨텍스트 최소 소비 (Gemini 1회 + 안내 메시지).
+2. **Preset/Profile 초기 제안**: Ensembra 가 필요하면 어느 경로로 시작할지 (기존 Stage A 역할).
+
+**하나의 Gemini 호출로 두 판정** → 비용 최소화. `pre_flight.enabled: false` 설정 시 (1)번 건너뜀 (기존 v0.9.1 동작).
 
 ### Stage A 실행
 
@@ -118,11 +123,31 @@ Conductor 는 프로파일 확정 시 배지 출력:
 
 3. **폴백**: Gemini 호출 실패 시 Claude Code 본체가 키워드 매칭 기반 간이 스코어링 수행 (정확도 낮음).
 
-4. **초기 경로 결정**:
+4. **Pre-flight Bailout 판정** (v0.9.2+):
+
+   Gemini 응답의 `ensembra_needed: false` 이면:
+
+   ```
+   💡 Pre-flight Bailout — Ensembra 불필요 판정
+
+   감지 intent:  {intent}
+   사유:        {bailout_reason}
+   권장:        {suggested_action}
+     - direct_edit   → Claude Code 직접 수정 (예: "Edit 으로 line 42 수정")
+     - claude_chat   → /ensembra:run 없이 일반 대화 권장
+
+   [1] 권장대로 종료 (Enter)
+   [2] 그래도 Ensembra 진행 (사용자 override)
+   ```
+
+   `pre_flight.auto_bailout: true` 면 사용자 확인 없이 자동 종료 + 로그 기록.
+   `[2]` 선택 시 아래 초기 경로 결정 로직으로 진행.
+
+5. **초기 경로 결정** (`ensembra_needed: true` 인 경우):
 
    | 점수 | 제안 preset | 제안 profile |
    |-----|----------|-----------|
-   | 0 (read-only) | Ensembra 생략 권장 (Claude 직접 대화) | — |
+   | 0 (read-only + Critical 없음) | bailout (above) | — |
    | 1~2 | 제안 생략 또는 `ops` | pro-plan |
    | 3~5 | `ops` | pro-plan |
    | 6~9 | `bugfix` | pro-plan |
@@ -162,7 +187,71 @@ Conductor 는 프로파일 확정 시 배지 출력:
 ## 파이프라인 실행 순서
 
 ### Phase 0 — Gather (Deep Scan)
-`presets/{preset}.yaml` 의 `deep_scan` 설정을 읽되, **Plan Tier Resolution** 결과를 겹쳐 적용한다. `tier=pro` 면 optional 4항목은 모두 off, forced 6항목 중 3·4·10 은 압축 모드. `tier=max` 면 preset 지시 그대로. 확정된 체크리스트로 다음을 **병렬 tool call** 로 수행:
+
+**v0.9.2+ 캐시 조회 우선**: `deep_scan.cache_enabled: true` (기본) 이면 Phase 0 tool call 실행 **전** 에 캐시 조회한다.
+
+1. **캐시 키 생성**:
+   ```
+   key = sha256(
+     project_root_absolute_path
+     + "|"
+     + git_head_commit_hash (Bash: git rev-parse HEAD)
+     + "|"
+     + preset_name
+     + "|"
+     + plan_tier
+     + "|"
+     + request_intent  (Stage A 의 intent 필드)
+   )[0:16]
+   ```
+
+2. **캐시 파일 경로**: `{deep_scan.cache_path}/phase0-{key}.json` (기본 `.ensembra/cache/phase0-{key}.json`)
+
+3. **HIT 조건** (모두 만족):
+   - 파일 존재 + 유효한 JSON
+   - `cached_at` 이 현재 시각 - `cache_ttl_hours` 이내 (기본 6시간)
+   - `git_head` 가 현재 git HEAD 와 동일
+   - `schema_version` 이 현재 Ensembra 버전과 호환
+
+4. **HIT 시 동작**: Read 1회로 `context_snapshot` + `reuse_inventory` 로드. Glob/Grep/Bash 생략 → Claude 컨텍스트 누적 약 80% 감소.
+
+   ```
+   ✅ Phase 0 Cache HIT (key=a3f2b9c1, age=2.3h, git=65a4916)
+      Deep Scan 생략. 캐시에서 context_snapshot 복원.
+   ```
+
+5. **MISS 시 동작**: 아래 Deep Scan 수행 + 결과를 캐시 파일에 저장.
+
+   ```
+   ⚠ Phase 0 Cache MISS (key=a3f2b9c1, reason=git-changed)
+     Deep Scan 수행 중...
+   ```
+
+6. **캐시 무효화 트리거**:
+   - `git HEAD` 변경 (git commit 발생)
+   - `cache_ttl_hours` 초과
+   - `.ensembra/cache/` 수동 삭제
+   - Ensembra 버전 변경 (schema_version mismatch)
+
+7. **캐시 파일 포맷**:
+   ```json
+   {
+     "schema_version": "0.9.2",
+     "cached_at": "2026-04-17T10:23:45Z",
+     "git_head": "65a4916",
+     "preset": "ops",
+     "plan_tier": "pro",
+     "request_intent": "bugfix",
+     "context_snapshot": "...",
+     "reuse_inventory": { ... }
+   }
+   ```
+
+**보안**: 캐시 파일에 시크릿·API 키·사용자 요청 원문 포함 금지. `context_snapshot` 에 이미 마스킹된 값만 기록.
+
+---
+
+`presets/{preset}.yaml` 의 `deep_scan` 설정을 읽되, **Plan Tier Resolution** 결과를 겹쳐 적용한다. `tier=pro` 면 optional 4항목은 모두 off, forced 6항목 중 3·4·10 은 압축 모드. `tier=max` 면 preset 지시 그대로. 확정된 체크리스트로 다음을 **병렬 tool call** 로 수행 (**캐시 MISS 시에만**):
 
 1. **강제 6항목** (끌 수 없음):
    - 구조 파악: `Glob "**/*"` 상위 디렉토리 + 진입점 파일(`main.*`, `index.*`, `app.*`) 식별

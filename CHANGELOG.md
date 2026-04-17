@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.2] — 2026-04-17 (Pre-flight Bailout + Deep Scan 캐싱)
+
+### Added — 프롬프트 해석 비용 절감 2종
+
+**문제 인식**: Conductor(Claude Code 본체) 의 프롬프트 해석·Phase 0 Deep Scan·오케스트레이션 로직은 사용자 Claude 세션 토큰을 소비한다. Gemini/Ollama 로 이관 불가능한 영역. v0.9.2 는 이 "해석 비용" 자체를 줄이는 2가지 메커니즘을 도입.
+
+#### A. Pre-flight Bailout
+
+- **Stage A Gemini Triage 확장**: 기존 preset/profile 제안에 더해 `ensembra_needed: boolean` + `bailout_reason` + `suggested_action` 필드 추가 출력
+- 하나의 Gemini 호출로 "Ensembra 필요 여부 + 초기 경로" 동시 판정 → Gemini 호출 수 증가 없음
+- `ensembra_needed: false` 판정 시 Phase 0 진입 없이 사용자 안내로 종료 (`direct_edit` 또는 `claude_chat` 권장)
+- 안전 편향: Critical 키워드·경로 감지 시 자동 `true` override
+- `pre_flight.auto_bailout: false` (기본) 면 사용자 확인 프롬프트, `true` 면 자동 종료
+
+**효과**: 일 75건 중 **30~40건이 bailout** 예상 → Phase 0 Deep Scan·Phase 1 진입 전 종료
+
+#### B. Phase 0 Deep Scan 캐싱
+
+- Phase 0 수행 결과를 `.ensembra/cache/phase0-{key}.json` 에 저장
+- 캐시 키: `sha256(project_path + git_head + preset + tier + intent)[0:16]`
+- HIT 조건: 파일 존재 + TTL 이내 + git HEAD 동일 + schema_version 호환
+- HIT 시 Read 1회로 context_snapshot 복원. Glob/Grep/Bash 수십 회 tool call 생략
+- TTL 기본 6시간. git commit 발생 시 자동 무효화
+- `.gitignore` 에 `.ensembra/cache/` 추가
+
+**효과**: 같은 프로젝트 반복 작업 시 Phase 0 비용 ~80% 절감. 운영업무 다수 작업에서 캐시 히트 비율 70%+ 예상
+
+### Changed
+
+- `roles/triage.py` SYSTEM_PROMPT 에 Pre-flight Bailout 판정 로직 추가 (ensembra_needed, bailout_reason, suggested_action 필드)
+- `skills/run/SKILL.md` Stage A 섹션에 Bailout 판정 플로우 + Phase 0 캐시 조회 로직 추가
+- `CONTRACT.md` §19.5 Pre-flight Bailout, §20 Deep Scan Caching 2개 섹션 신설
+- `schemas/config.json` 에 4개 필드 추가:
+  - `deep_scan.cache_enabled` (기본 true)
+  - `deep_scan.cache_ttl_hours` (기본 6)
+  - `deep_scan.cache_path` (기본 `.ensembra/cache`)
+  - `pre_flight.enabled` (기본 true)
+  - `pre_flight.auto_bailout` (기본 false)
+- `.gitignore` 에 `.ensembra/cache/` 추가
+
+### 예상 효과 (v0.9.1 대비)
+
+일 75건 운영업무 기준:
+
+| 단계 | v0.9.1 누적 | v0.9.2 누적 | 추가 절감 |
+|------|------------|------------|---------|
+| 단일 실행 평균 | ~2.6% | ~1.0% | -62% |
+| 일일 누적 | ~193% | ~69% | -64% |
+
+v0.8.1 대비 누적 절감률: **~96%**
+
+### Version bump
+
+- `0.9.1` → `0.9.2` (PATCH, 기능 추가만)
+- 기존 사용자 영향: 없음. 기본값 활성화로 재설치 시 자동 적용.
+- Gemini 미설정 시 Pre-flight 폴백 — Claude Code 본체의 간이 키워드 매칭 사용 (정확도 낮음, `risk_routing.critical_keywords` 설정 권장)
+
 ## [0.9.1] — 2026-04-17 (외부 LLM 사용 증명 4종 강화)
 
 ### Added — Proof-of-Invocation 4종 메커니즘

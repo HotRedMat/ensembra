@@ -1217,6 +1217,114 @@ v0.9.0 에서 모든 Gemini 경유 호출은 **단일 MCP server** (`gemini-ense
 
 `request_hash` 로 원문 미보존 (개인정보·시크릿 유출 방지).
 
+### 19.5 Pre-flight Bailout (v0.9.2+)
+
+Stage A Triage 의 확장 기능. Gemini flash 가 "이 요청은 Ensembra 가치 없음" 을 판정할 수 있게 하여 Phase 0 진입 자체를 생략하는 비용 절감 메커니즘.
+
+#### 19.5.1 판정 원칙
+
+- `ensembra_needed: false` → Phase 0 진입하지 않고 종료
+- `ensembra_needed: true` → 기존 Stage A → Phase 0 진입
+
+Gemini 는 **하나의 호출**로 두 판정을 동시에 수행 (ensembra_needed + preset/profile 제안). 별도 호출 추가 없음.
+
+#### 19.5.2 Bailout 시 권장 경로
+
+Gemini 응답의 `suggested_action` 필드:
+
+- `direct_edit`: Claude Code 가 직접 Edit 으로 수정 (예: 2줄 오타, 상수값 변경)
+- `claude_chat`: `/ensembra:run` 없이 일반 대화로 진행 (예: 코드 설명, 원인 진단 질문)
+- `ensembra_ops` / `ensembra_ops_safe` / `ensembra_bugfix` / `ensembra_feature_pro` / `ensembra_feature_max`: Ensembra 필요 (bailout 하지 않음)
+
+Conductor 는 bailout 시 사용자에게 1회 확인 프롬프트 (`pre_flight.auto_bailout: false` 기본).
+
+#### 19.5.3 안전 편향
+
+다음은 `ensembra_needed: false` 판정 **불가** (Stage A 가 위반 시 Conductor 가 true 로 override):
+
+- Critical 키워드 감지 (auth·payment·schema·.env 등)
+- Critical 경로 수정 (/auth/, /payment/, /migrations/ 등)
+- `confidence < 0.6` (불확실 → 안전)
+- 치명 신호 (§19 Kill Switch 와 동일 목록)
+
+#### 19.5.4 토글
+
+- `pre_flight.enabled: true` (기본)
+- `pre_flight.auto_bailout: false` (기본 — 사용자 확인 필수)
+
+`pre_flight.enabled: false` 면 Gemini 응답의 `ensembra_needed` 필드 무시, 항상 Phase 0 진입 (v0.9.1 동작).
+
+#### 19.5.5 로깅
+
+Bailout 결정은 `docs/reports/risk/runs.jsonl` 에 기록 (기존 Risk Routing 로그와 같은 파일):
+
+```json
+{
+  "ts": "...",
+  "request_hash": "...",
+  "stage_a": { "...": "..." },
+  "pre_flight": {
+    "ensembra_needed": false,
+    "bailout_reason": "...",
+    "suggested_action": "direct_edit",
+    "user_accepted": true
+  },
+  "final_route": "bailout (no pipeline execution)"
+}
+```
+
+---
+
+## 20. Deep Scan Caching (v0.9.2+)
+
+Phase 0 Deep Scan 결과를 로컬 파일로 캐시해 반복 실행 시 재사용. 운영업무처럼 같은 프로젝트에 여러 요청이 들어오는 환경에서 Phase 0 tool call 비용을 대폭 절감.
+
+### 20.1 설계 근거
+
+Phase 0 Deep Scan 은 Glob/Grep/Read/Bash 수십 회 tool call 을 수행한다. 결과가 Claude Code 컨텍스트에 누적되어 단일 실행에 ~5% 컨텍스트 소비. 같은 프로젝트·같은 유형 요청을 반복하면 매번 동일한 Deep Scan 을 다시 하는 낭비.
+
+### 20.2 캐시 키 구성
+
+```
+key = sha256(
+  project_root_absolute_path + "|"
+  + git_head_commit_hash + "|"
+  + preset_name + "|"
+  + plan_tier + "|"
+  + request_intent
+)[0:16]
+```
+
+- 프로젝트별, 커밋별, preset·tier·intent 조합별 독립 캐시
+- git 변경 시 자동 무효화
+
+### 20.3 캐시 파일 경로·포맷
+
+- 경로: `{deep_scan.cache_path}/phase0-{key}.json` (기본 `.ensembra/cache/phase0-{key}.json`)
+- 포맷: `skills/run/SKILL.md` Phase 0 섹션 참조
+- `.gitignore` 에 `.ensembra/cache/` 추가 (v0.9.2 기본값)
+
+### 20.4 무효화 조건
+
+- `git HEAD` 해시 불일치
+- `cache_ttl_hours` 경과 (기본 6시간)
+- `schema_version` 불일치 (Ensembra 버전 업그레이드 시)
+- 사용자 수동 삭제 (`rm -rf .ensembra/cache/`)
+
+### 20.5 보안 불변식
+
+- 캐시 파일에 API 키·시크릿 포함 절대 금지
+- 사용자 요청 원문 미보존 (request_intent 만 기록)
+- Conductor 는 캐시 파일 저장 전 시크릿 마스킹 재확인
+
+### 20.6 토글·튜닝
+
+- `deep_scan.cache_enabled: true` (기본)
+- `deep_scan.cache_ttl_hours: 6` (기본, 1~72 허용)
+- `deep_scan.cache_path: ".ensembra/cache"` (기본)
+
+CI/CD 환경이나 캐시 불필요한 경우 `cache_enabled: false`. 개발 속도가 중요한 환경은 `cache_ttl_hours: 24` 로 확장 가능 (단 git commit 없이 파일 수정 시 캐시 stale 가능성 유의).
+
 ---
 
 ## 18. Gate2 이월 항목
