@@ -109,10 +109,33 @@
     },
     "fallback": {
       "type": "object",
-      "description": "외부 Transport 실패 시 최종 폴백",
+      "description": "외부 Transport 실패 시 최종 폴백 + v0.9.3+ 폴백 승인 프로토콜",
       "properties": {
         "transport": { "type": "string", "const": "claude-subagent" },
-        "model": { "type": "string" }
+        "model": { "type": "string" },
+        "confirmation_mode": {
+          "type": "string",
+          "enum": ["strict", "critical_only", "none"],
+          "default": "critical_only",
+          "description": "v0.9.3+. 외부 LLM 실패 시 Claude 폴백 사용자 승인 모드. strict=모든 폴백 확인 / critical_only=외부 체인 전부 실패 시만 확인(기본) / none=자동 폴백(v0.9.2 동작)."
+        },
+        "session_auto_approve": {
+          "type": "boolean",
+          "default": false,
+          "description": "v0.9.3+. 한 세션 내 첫 폴백 승인 후 동일 유형 폴백은 자동 진행. 사용자 [5] 선택 시 이 세션만 true 로 전환. config 저장 안 함."
+        },
+        "batch_by_phase": {
+          "type": "boolean",
+          "default": true,
+          "description": "v0.9.3+. Phase 시작 직전 Health Check 로 예상 폴백을 배치 감지해 단일 프롬프트로 묶는다. false 면 매 Performer 호출 시점마다 개별 프롬프트 (피로도 높음)."
+        },
+        "retry_delay_sec": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 300,
+          "default": 30,
+          "description": "v0.9.3+. 사용자가 [4] 재시도 선택 시 대기 시간(초). Gemini rate limit 복구 목적."
+        }
       }
     },
     "rounds": {

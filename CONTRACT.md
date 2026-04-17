@@ -531,6 +531,101 @@ scribe 가 생성하는 Task Report (`docs/reports/tasks/{YYYY-MM-DD}-{slug}.md`
 - 비활성화 시 §8.6.5 의 4종 전부 억제. §8.6.1~§8.6.4 Live Indicators 는 `show_transport_badge` 로 별도 토글
 - 두 설정 모두 비활성화해도 Task Report 의 기본 "## 외부 LLM 사용 증거" 섹션은 **쓰기 전용 기본값으로 유지** (사후 감사 보장). 섹션 자체를 숨기려면 `reports.task_report_proof_section: false` 명시 필요 (비권장)
 
+### 8.9 폴백 승인 프로토콜 (v0.9.3+)
+
+외부 LLM (MCP/Ollama) 실패 → Claude 폴백 발생 시 사용자 명시적 승인을 요구하는 프로토콜. 예상치 못한 Claude 토큰 소비 사전 차단.
+
+#### 8.9.1 3단 승인 모드 (`fallback.confirmation_mode`)
+
+| 모드 | 동작 | 사용 시나리오 |
+|-----|------|-------------|
+| `strict` | 모든 단계 폴백(MCP→Ollama, Ollama→Claude) 마다 확인 | 최대 통제 (CI/자동화 환경) |
+| **`critical_only`** (기본) | **외부 체인 전부 실패 → Claude 폴백**만 확인. 외부간 폴백(MCP→Ollama)은 자동 | **일반 권장** |
+| `none` | 자동 폴백 (v0.9.2 동작) | 무인 실행 필요 시 |
+
+#### 8.9.2 사전 Health Check + Phase 배치 (`batch_by_phase: true` 기본)
+
+Phase 1 R1 / Phase 3 Audit 시작 **직전** Transport Health Check 를 일괄 수행:
+
+```
+📡 Phase 1 R1 — 사전 Transport Health Check
+
+외부 LLM 가용성:
+  ✓ Gemini MCP       정상 (health check 200, 14/15 RPM 사용 중)
+  ✗ Ollama localhost 연결 실패 (connection refused)
+  ✓ Claude           항상 가용
+
+영향 Performer:
+  - qa:       Ollama → Claude sonnet 폴백 예정 (~3KB)
+  - security: Ollama → Claude sonnet 폴백 예정 (~3KB)
+
+예상 Claude 토큰 소비: ~6KB
+```
+
+사용자 프롬프트:
+```
+[1] 2명 모두 Claude 폴백 진행
+[2] qa 만 폴백, security 스킵
+[3] security 만 폴백, qa 스킵
+[4] 둘 다 스킵 (⚠ 결과 불완전 가능)
+[5] 중단하고 Ollama 재기동 후 다시 시도 (30초 대기)
+[6] 이번 세션 동안 자동 승인
+```
+
+선택에 따라 Phase 진행. 같은 Phase 내 개별 프롬프트 반복 없음.
+
+#### 8.9.3 개별 폴백 프롬프트 (Health Check 이후 실행 중 발생 시)
+
+Health Check 에서 예측하지 못한 실시간 실패(예: API가 갑자기 401)에는 개별 프롬프트:
+
+```
+┌─────────────────────────────────────────────┐
+│  ⚠ 외부 LLM 폴백 승인 필요                   │
+│                                              │
+│  Performer:  architect (Phase 1 R2)          │
+│  시도 내역:                                  │
+│    ✗ Gemini MCP  gemini-2.5-flash  HTTP 429 │
+│    ✗ Ollama      qwen2.5:14b       timeout  │
+│    ? Claude      sonnet            (예정)    │
+│                                              │
+│  예상 Claude 토큰: ~3KB                      │
+│                                              │
+│  [1] Claude sonnet 으로 폴백 진행           │
+│  [2] 이 Performer 스킵 (⚠ 결과 불완전)       │
+│  [3] 파이프라인 중단                         │
+│  [4] {retry_delay_sec} 초 대기 후 재시도    │
+│  [5] 이번 세션 동안 자동 승인                │
+└─────────────────────────────────────────────┘
+```
+
+#### 8.9.4 Session Auto-Approve
+
+사용자가 `[5] 이번 세션 동안 자동 승인` 선택 시:
+- 해당 세션 한정 `fallback.session_auto_approve: true` 로 메모리 전환
+- config 파일에 저장하지 **않음** (다음 세션에서 다시 물음)
+- 이후 동일 유형 폴백은 자동 진행 + 배지 알림만 유지
+
+#### 8.9.5 예측 경고 배지 (v0.9.3+)
+
+Phase 시작 시점의 Transport 현황판(§8.6.1) 에 폴백 예측 정보 추가:
+
+```
+📡 Phase 1 R1 — Transport 계획:
+  [Gemini]  architect     → gemini-2.5-flash   ⓘ rate limit 근접 (14/15 RPM)
+  [Ollama]  qa            → qwen2.5:14b        ⚠ health check 실패
+  [Ollama]  security      → qwen2.5:14b        ⚠ health check 실패
+  
+⚠ 예상 폴백: qa, security → Claude sonnet (~6KB)
+```
+
+ⓘ = 정보, ⚠ = 경고. 이 배지는 `show_transport_badge: true` 로 토글.
+
+#### 8.9.6 보안·로깅
+
+- 폴백 결정은 `docs/reports/risk/runs.jsonl` 에 append (user_choice 필드 포함)
+- API 키·에러 본문·프롬프트 내용 포함 금지 (HTTP status·timeout 사유만)
+- 사용자 `[3] 중단` 선택 시 pipeline.status=cancelled_by_user 로 종료
+
 ### 8.7 라운드 피로도 대응
 
 Ollama 는 즉시 응답하지만 Gemini 무료 티어는 분당 15 요청 제한이 있다. Conductor 는:

@@ -419,6 +419,48 @@ Stage B 점수: 18 (변동 +13)
 
 ### Phase 1 — Deliberate
 
+#### v0.9.3+ 사전 Transport Health Check + 폴백 승인
+
+Phase 1 R1 시작 **직전** `fallback.batch_by_phase: true` (기본) 일 때 모든 외부 Transport 에 대해 Health Check 일괄 수행 (`CONTRACT.md §8.9` 참조):
+
+1. Gemini MCP: `tools/list` 로 서버 응답 확인 (300초 TTL 캐시)
+2. Ollama: `GET {endpoint}/api/tags` 200 + 모델 존재
+3. Rate limit 근접 감지: Gemini API 응답 헤더의 `X-RateLimit-Remaining` 체크 (14/15 RPM 이하 시 ⓘ 배지)
+
+**사전 경고 배지 출력**:
+```
+📡 Phase 1 R1 — Transport 계획 (폴백 예측 포함):
+  [Gemini]  architect     → gemini-2.5-flash   ⓘ rate limit 근접
+  [Ollama]  qa            → qwen2.5:14b        ⚠ health check 실패
+  [Ollama]  security      → qwen2.5:14b        ⚠ health check 실패
+  [Claude]  planner       → sonnet             ✓ (기본)
+  
+⚠ 예상 폴백 2건: qa, security → Claude sonnet (~6KB 소비)
+```
+
+**폴백 승인 필요 조건** (`confirmation_mode`):
+- `strict`: 어떤 ⚠ 라도 감지되면 프롬프트
+- `critical_only` (기본): 외부 체인 전부 실패로 Claude 최종 폴백이 필요할 때만 프롬프트
+- `none`: 프롬프트 없이 자동 진행
+
+**프롬프트 예시** (critical_only 모드, 2명 Claude 폴백 예정):
+```
+[1] 2명 모두 Claude 폴백 진행 (Enter)
+[2] qa 만 폴백, security 스킵
+[3] security 만 폴백, qa 스킵
+[4] 둘 다 스킵 (⚠ 결과 불완전 가능)
+[5] 중단하고 Ollama 재기동 후 다시 시도 (30초 대기)
+[6] 이번 세션 동안 자동 승인
+```
+
+`session_auto_approve: true` (세션 한정) 상태에서는 프롬프트 생략 + 배지 알림만.
+
+#### 실시간 폴백 (Health Check 후 발생)
+
+Phase 진행 중 예측하지 못한 실패(예: 401 갑작스런 발생)가 있으면 개별 Performer 에 대해 프롬프트. 같은 세션에서 `session_auto_approve: true` 면 자동 폴백 + 배지 알림만.
+
+---
+
 1. **R1 독립 분석**: `presets/{preset}.yaml` 의 `performers` 목록의 각 Performer 를 순차 호출 (subagent 또는 외부 Transport). 각자에게 **동일한** `problem` + `context_snapshot` + `reuse_inventory` 전달. 서로의 답을 보지 못함. Performer 는 `reuse_inventory` 범위 내에서만 재사용 후보를 검토하며, 인벤토리 외 심볼 참조 시 Phase 0 재수집 요청 또는 `new_creation_justified` 근거 제시 필수.
 
 2. **R2 반론** (조건부): `rounds` 설정 + **Plan Tier** 에 따라.

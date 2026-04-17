@@ -92,6 +92,33 @@ v0.6.0 에서 제거되었던 Gemini 서브메뉴가 v0.7.0 에서 MCP 기반으
 
 **불변식**: picker 는 `gemini_api_key` 를 **절대 읽지·쓰지·길이 측정도 하지 않는다**. 키 설정은 `/plugin → ensembra → Configure options` 에서만 가능.
 
+### (5)e Fallback 승인 프로토콜 (v0.9.3+)
+
+외부 LLM 실패 시 Claude 폴백 사용자 승인 설정.
+
+```
+Ensembra > Transports > Fallback (v0.9.3+)
+──────────────────────────────
+현재: critical_only, batch_by_phase=true, retry=30s
+
+1) 승인 모드:
+     a) strict         — 모든 폴백 확인 (외부→Ollama도)
+     b) critical_only  — 외부 체인 전부 실패 시만 확인 (권장, 기본)
+     c) none           — 자동 폴백 (v0.9.2 동작)
+
+2) Phase 배치 처리: [x] on / [ ] off
+     on 시 Phase 시작 직전 1회 Health Check 로 일괄 승인.
+     off 시 매 Performer 호출 시점마다 개별 프롬프트 (피로도 높음).
+
+3) Retry 대기 시간:  현재 30초 (5~300초)
+     [4] 재시도 선택 시 대기. Gemini rate limit 복구 목적.
+
+9) 저장 후 상위 메뉴
+0) 취소
+```
+
+**session_auto_approve** 는 실행 중 사용자가 [6] 선택 시 세션 한정 활성화. config 저장 안 함 (다음 세션 초기화).
+
 ### (6) Timeouts
 Ollama/Gemini/Claude-subagent/Deep-Scan 각각 초 단위.
 

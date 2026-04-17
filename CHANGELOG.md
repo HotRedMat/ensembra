@@ -7,6 +7,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.3] — 2026-04-17 (폴백 승인 프로토콜 — 예상치 못한 Claude 토큰 소비 차단)
+
+### Added — 폴백 승인 3종 메커니즘
+
+**문제 인식**: v0.9.2 까지 외부 LLM (Gemini MCP / Ollama) 실패 시 **조용히 자동 폴백** → Claude 토큰 예기치 못한 소비. 비용 절감 의도를 무시하는 동작이었음. v0.9.3 은 폴백 발생 전 사용자 명시 승인을 요구.
+
+#### A. 사전 Transport Health Check + Phase 배치 처리
+
+- Phase 1 R1 / Phase 3 Audit 시작 **직전** 외부 Transport 일괄 Health Check
+- Gemini MCP: `tools/list` 응답 (300초 TTL 캐시)
+- Ollama: `GET /api/tags` 200 + 모델 존재
+- Rate limit 근접 감지: `X-RateLimit-Remaining` 헤더 모니터링
+- 예상 폴백을 **단일 프롬프트**로 배치 처리 → 개별 프롬프트 피로 방지
+
+#### B. 3단 승인 모드 (`fallback.confirmation_mode`)
+
+- `strict`: 모든 단계 폴백(외부→외부 포함) 확인
+- `critical_only` (기본): 외부 체인 전부 실패 → Claude 최종 폴백만 확인
+- `none`: 자동 폴백 (v0.9.2 동작)
+
+#### C. Session Auto-Approve
+
+- 사용자 `[6] 이번 세션 동안 자동 승인` 선택 시 세션 한정 자동 처리
+- config 파일에 저장 안 함 (다음 세션에서 다시 물음)
+- 이후 동일 유형 폴백은 배지 알림만
+
+#### 프롬프트 UX
+
+```
+📡 Phase 1 R1 — 사전 Transport Health Check
+
+외부 LLM 가용성:
+  ✓ Gemini MCP       정상 (14/15 RPM 사용 중)
+  ✗ Ollama localhost 연결 실패
+  ✓ Claude           항상 가용
+
+영향 Performer:
+  - qa:       Ollama → Claude sonnet 폴백 예정 (~3KB)
+  - security: Ollama → Claude sonnet 폴백 예정 (~3KB)
+
+예상 Claude 토큰: ~6KB
+
+[1] 2명 모두 Claude 폴백 진행
+[2] qa 만 폴백, security 스킵
+[3] security 만 폴백, qa 스킵
+[4] 둘 다 스킵 (⚠ 결과 불완전 가능)
+[5] 중단하고 Ollama 재기동 후 다시 시도 (30초 대기)
+[6] 이번 세션 동안 자동 승인
+```
+
+#### 예측 경고 배지 (§8.6.1 Transport 현황판 확장)
+
+```
+📡 Phase 1 R1 — Transport 계획:
+  [Gemini]  architect   → gemini-2.5-flash   ⓘ rate limit 근접
+  [Ollama]  qa          → qwen2.5:14b        ⚠ health check 실패
+  
+⚠ 예상 폴백 1건: qa → Claude sonnet (~3KB)
+```
+
+### Changed
+
+- `CONTRACT.md §8.9 폴백 승인 프로토콜` 신설 (4개 하위섹션)
+- `skills/run/SKILL.md` Phase 1 시작 섹션에 Health Check + 프롬프트 플로우 추가
+- `skills/config/SKILL.md (5)e Fallback 승인 설정` 서브메뉴 추가
+- `schemas/config.json` `fallback` 섹션에 4개 필드 추가:
+  - `confirmation_mode` (기본 critical_only)
+  - `session_auto_approve` (기본 false, 세션 한정)
+  - `batch_by_phase` (기본 true)
+  - `retry_delay_sec` (기본 30초)
+
+### Version bump
+
+- `0.9.2` → `0.9.3` (PATCH, 사용성·안전성 강화)
+- 기존 사용자 영향: 첫 외부 LLM 실패 시 프롬프트 노출 시작. 이전 자동 폴백 동작을 원하면 `/ensembra:config → Transports → Fallback → 승인 모드: none` 선택.
+
 ## [0.9.2] — 2026-04-17 (Pre-flight Bailout + Deep Scan 캐싱)
 
 ### Added — 프롬프트 해석 비용 절감 2종
