@@ -20,7 +20,10 @@ phase2:
 
 phase3:
   audit: true
-  auditors: [planner, architect, developer, security, qa, devils-advocate]
+  # v0.8.0+: 전문 감사자 → final-auditor 2단계. 순서 보존 필수 (final-auditor 는 항상 마지막).
+  # planner 는 v0.8.0 부터 Phase 3 감사에서 제외 — final-auditor 가 요구사항 충족 여부 종합.
+  auditors: [architect, developer, security, qa, devils-advocate, final-auditor]
+  final_auditor: final-auditor  # 만장일치 판정자. CONTRACT.md §11.3
 
 phase4:
   document: true

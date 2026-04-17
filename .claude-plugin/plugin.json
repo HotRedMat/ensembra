@@ -1,6 +1,6 @@
 {
   "name": "ensembra",
-  "version": "0.7.2",
+  "version": "0.8.0",
   "description": "Multi-agent orchestrator plugin for Claude Code — agents perform in concert through a 5-phase pipeline (Gather → Deliberate → Execute → Audit → Document) with Reuse-First cross-cutting policy.",
   "author": {
     "name": "Seungho Lee",
@@ -37,7 +37,13 @@
     "ollama_endpoint": {
       "type": "string",
       "title": "Ollama endpoint",
-      "description": "Ollama HTTP endpoint for the security and qa Performers. Default: http://localhost:11434. Leave blank to skip Ollama — those Performers will fall back to Claude sub-agents.",
+      "description": "Ollama HTTP endpoint for the security, qa, and (opt-in) developer Performers. Default: http://localhost:11434. Leave blank to skip Ollama — those Performers will fall back to Claude sub-agents.",
+      "sensitive": false
+    },
+    "developer_transport": {
+      "type": "string",
+      "title": "developer Performer transport (v0.8.0+, opt-in)",
+      "description": "Opt-in override for the developer Performer transport chain. Values: 'claude' (default, keep Claude sub-agent sonnet — safest for Phase 2 style match), 'external' (use MCP(gemini-2.5-pro) → Ollama(gpt-oss:20b) → Claude sonnet fallback chain — maximizes external LLM use, reduces Claude token cost). Leave blank to use the default. See CONTRACT.md §8.8 Transport Fallback Chain Protocol.",
       "sensitive": false
     }
   }

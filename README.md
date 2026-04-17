@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/HotRedMat/ensembra/releases"><img src="https://img.shields.io/badge/version-0.7.2-blue" alt="version"/></a>
+  <a href="https://github.com/HotRedMat/ensembra/releases"><img src="https://img.shields.io/badge/version-0.8.0-blue" alt="version"/></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="license"/></a>
   <img src="https://img.shields.io/badge/plugin%20validate-passing-brightgreen" alt="plugin validate"/>
   <img src="https://img.shields.io/badge/verification-end--to--end-brightgreen" alt="verification"/>
@@ -57,17 +57,35 @@ Phase 3 Audit      — designated performers verify the diff
 Phase 4 Document   — scribe records Task / Design / Request / Daily / Weekly
 ```
 
-## Performers
+## Performers (v0.8.0+ Debate/Audit split)
+
+v0.8.0 splits Performers into three tiers. **Opus is forbidden in debate** and used only by the `final-auditor` in Phase 3 — the unanimous-consensus judge.
+
+**Debate (Phase 1) — external LLMs + sonnet-or-lower, no opus:**
 
 | Role | Responsibility | Default Transport | Default Model |
 |---|---|---|---|
-| 🧭 **planner** | Requirements, acceptance criteria | Claude sub-agent | `opus` |
+| 🧭 **planner** | Requirements, acceptance criteria | Claude sub-agent | `sonnet` (v0.8.0: was opus) |
 | 🏛 **architect** | Module boundaries, patterns | MCP (Gemini) → Ollama → Claude | `gemini-2.5-flash` |
-| 🛠 **developer** | Implementation strategy | Claude sub-agent | `sonnet` |
-| 🛡 **security** | Threats, secrets, OWASP | Ollama | `qwen2.5:14b` |
-| 🧪 **qa** | Edge cases, regression | Ollama | `llama3.1:8b` |
+| 🛠 **developer** | Implementation strategy | Claude sub-agent (opt-in external chain) | `sonnet` |
+| 🛡 **security** | Threats, secrets, OWASP | Ollama → Claude | `qwen2.5:14b` |
+| 🧪 **qa** | Edge cases, regression | Ollama → Claude | `llama3.1:8b` |
 | 😈 **devils-advocate** | Counter-arguments, YAGNI | Claude sub-agent | `haiku` |
+
+**Audit (Phase 3) — specialist auditors → final-auditor:**
+
+| Role | Responsibility | Default Transport | Default Model |
+|---|---|---|---|
+| (specialists) | Preset-specific specialists (see presets table) | varies | varies |
+| ⚖️ **final-auditor** | Unanimous-consensus judge, always last (v0.8.0) | Claude sub-agent | `opus` |
+
+**Document (Phase 4):**
+
+| Role | Responsibility | Default Transport | Default Model |
+|---|---|---|---|
 | ✍️ **scribe** | Phase 4 documentation | Claude sub-agent | `sonnet` |
+
+Unanimous consensus (v0.8.0) = Phase 1 agreement ≥ 70% **AND** `final-auditor.verdict == pass`. Final-auditor rework is capped at 1 cycle (opus cost control). See `CONTRACT.md §8.8` for the generalized Transport Fallback Chain Protocol and `§11.3` for Final Audit details.
 
 All models auto-fall back to Claude sub-agents when the external transport is unavailable.
 
@@ -82,11 +100,11 @@ All models auto-fall back to Claude sub-agents when the external transport is un
 
 | Preset | Performers | Rounds | Phase 2 | Phase 3 Audit | Phase 4 |
 |---|---|---|---|---|---|
-| `feature` | all 6 | R1→R2→Syn | on | all 6 | Task+Design+Request |
-| `bugfix` | planner+architect+developer+qa | R1→Syn | on | qa+security | Task |
-| `refactor` | architect+developer+devils+qa | R1→R2→Syn | on | architect+devils | Task+Design+Request |
-| `security-audit` | security+devils+architect | R1→Syn | off | — | Task |
-| `source-analysis` | architect+security+developer | R1→Syn | off | — | Task |
+| `feature` | all 6 | R1→R2→Syn | on | specialists 5 + **final-auditor** | Task+Design+Request |
+| `bugfix` | planner+architect+developer+qa | R1→Syn | on | qa+security + **final-auditor** | Task |
+| `refactor` | architect+developer+devils+qa | R1→R2→Syn | on | architect+devils + **final-auditor** | Task+Design+Request |
+| `security-audit` | security+devils+architect | R1→Syn | off | — (read-only) | Task |
+| `source-analysis` | architect+security+developer | R1→Syn | off | — (read-only) | Task |
 | `transfer` | all 6 + scribe | R1 only | off | off | handover doc |
 
 ## Installation

@@ -27,42 +27,85 @@ import urllib.request
 # ---------------------------------------------------------------------------
 
 SERVER_NAME = "ensembra-gemini-architect"
-SERVER_VERSION = "0.7.2"
+SERVER_VERSION = "0.8.0"
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
-DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_ARCHITECT_MODEL = "gemini-2.5-flash"
+DEFAULT_DEVELOPER_MODEL = "gemini-2.5-pro"
 DEFAULT_TIMEOUT = 60
 
 KEYCHAIN_SERVICE = "Claude Code-credentials"
 PLUGIN_SECRET_PATH = ("pluginSecrets", "ensembra@ensembra", "gemini_api_key")
 
-TOOL_DEFINITION = {
-    "name": "architect_deliberate",
-    "description": (
-        "Send a prompt to Google Gemini and return the response. "
-        "Used by the Ensembra Conductor to delegate architect analysis "
-        "to a Gemini model via MCP, keeping the API key out of "
-        "skill/agent content."
-    ),
-    "inputSchema": {
-        "type": "object",
-        "required": ["prompt"],
-        "properties": {
-            "prompt": {
-                "type": "string",
-                "description": "The full prompt to send to Gemini.",
-            },
-            "model": {
-                "type": "string",
-                "description": f"Gemini model ID. Default: {DEFAULT_MODEL}",
-                "default": DEFAULT_MODEL,
-            },
-            "timeout_sec": {
-                "type": "integer",
-                "description": f"Request timeout in seconds. Default: {DEFAULT_TIMEOUT}",
-                "default": DEFAULT_TIMEOUT,
+# Backward compatibility: legacy consumers may still reference DEFAULT_MODEL
+DEFAULT_MODEL = DEFAULT_ARCHITECT_MODEL
+
+TOOL_DEFINITIONS = [
+    {
+        "name": "architect_deliberate",
+        "description": (
+            "Send an architect-framed prompt to Google Gemini and return the "
+            "response. Used by the Ensembra Conductor for Phase 1 R1/R2 architect "
+            "Performer calls and Phase 3 architect Audit. Keeps the API key out of "
+            "skill/agent content (MCP server env only)."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "required": ["prompt"],
+            "properties": {
+                "prompt": {
+                    "type": "string",
+                    "description": "The full prompt to send to Gemini.",
+                },
+                "model": {
+                    "type": "string",
+                    "description": f"Gemini model ID. Default: {DEFAULT_ARCHITECT_MODEL}",
+                    "default": DEFAULT_ARCHITECT_MODEL,
+                },
+                "timeout_sec": {
+                    "type": "integer",
+                    "description": f"Request timeout in seconds. Default: {DEFAULT_TIMEOUT}",
+                    "default": DEFAULT_TIMEOUT,
+                },
             },
         },
     },
+    {
+        "name": "developer_deliberate",
+        "description": (
+            "Send a developer-framed prompt to Google Gemini and return the "
+            "response. Used by the Ensembra Conductor when the developer Performer "
+            "is configured for MCP transport (opt-in via config.performers.developer"
+            ".transport_chain). Default model is gemini-2.5-pro for stronger "
+            "implementation-level reasoning. Shares the same credential and "
+            "masking guarantees as architect_deliberate."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "required": ["prompt"],
+            "properties": {
+                "prompt": {
+                    "type": "string",
+                    "description": "The full prompt to send to Gemini.",
+                },
+                "model": {
+                    "type": "string",
+                    "description": f"Gemini model ID. Default: {DEFAULT_DEVELOPER_MODEL}",
+                    "default": DEFAULT_DEVELOPER_MODEL,
+                },
+                "timeout_sec": {
+                    "type": "integer",
+                    "description": f"Request timeout in seconds. Default: {DEFAULT_TIMEOUT}",
+                    "default": DEFAULT_TIMEOUT,
+                },
+            },
+        },
+    },
+]
+
+# Map tool name → default model. Shared call_gemini handles both.
+TOOL_DEFAULT_MODEL = {
+    "architect_deliberate": DEFAULT_ARCHITECT_MODEL,
+    "developer_deliberate": DEFAULT_DEVELOPER_MODEL,
 }
 
 # ---------------------------------------------------------------------------
@@ -283,20 +326,20 @@ def handle_initialize(msg: dict) -> None:
 
 
 def handle_tools_list(msg: dict) -> None:
-    _ok(msg["id"], {"tools": [TOOL_DEFINITION]})
+    _ok(msg["id"], {"tools": TOOL_DEFINITIONS})
 
 
 def handle_tools_call(msg: dict) -> None:
     params = msg.get("params", {})
     tool_name = params.get("name", "")
 
-    if tool_name != "architect_deliberate":
+    if tool_name not in TOOL_DEFAULT_MODEL:
         _error(msg["id"], -32602, f"Unknown tool: {tool_name}")
         return
 
     args = params.get("arguments", {})
     prompt = args.get("prompt", "")
-    model = args.get("model", DEFAULT_MODEL)
+    model = args.get("model", TOOL_DEFAULT_MODEL[tool_name])
     timeout = args.get("timeout_sec", DEFAULT_TIMEOUT)
 
     if not prompt:

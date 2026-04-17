@@ -18,7 +18,9 @@ phase2:
 
 phase3:
   audit: true
-  auditors: [architect, devils-advocate]  # 설계 일관성·과잉 추상화 감시
+  # v0.8.0+: 전문 감사자(설계 일관성·과잉 추상화) → final-auditor(만장일치 판정).
+  auditors: [architect, devils-advocate, final-auditor]
+  final_auditor: final-auditor  # 만장일치 판정자. CONTRACT.md §11.3
 
 phase4:
   document: true

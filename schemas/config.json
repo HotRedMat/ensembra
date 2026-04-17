@@ -17,6 +17,11 @@
       "default": "pro",
       "description": "Claude 플랜 기반 실행 프로파일. pro = Claude Pro 사용자 기준 (Deep Scan 압축, Context Snapshot 요약, R2 diff 전달, Audit 1명). max = Claude Max 사용자 기준 (preset 원본 동작 유지). 우선순위: /ensembra:run --tier=... 인자 > 본 필드 > 'pro'. 세부 규칙은 CONTRACT.md §17 및 skills/run/SKILL.md 의 Tier Resolution 섹션 참조."
     },
+    "external_first": {
+      "type": "boolean",
+      "default": false,
+      "description": "v0.8.0+. true 면 Conductor 가 Claude 서브에이전트 폴백을 사용할 때 배지에 추가 경고를 표시하고, 외부 Transport(MCP/Ollama) 가용 시 무조건 외부 경로를 우선 시도한다. 금지선(planner/scribe Claude 고정, Phase 2 Execute Claude 본체 전담) 은 tier 와 동일하게 보호된다. 기본값 false 는 v0.7.x 동작을 보존한다."
+    },
     "performers": {
       "type": "object",
       "description": "역할별 Transport·모델 매핑",
@@ -163,16 +168,44 @@
       "properties": {
         "transport": {
           "type": "string",
-          "enum": ["claude-subagent", "gemini", "ollama", "mcp"]
+          "enum": ["claude-subagent", "gemini", "ollama", "mcp"],
+          "description": "단일 Transport 선언 (v0.7.x 호환). transport_chain 이 제공되면 그 쪽이 우선한다."
         },
         "mcp_server_name": {
           "type": "string",
           "description": "MCP server 이름 (transport=mcp 일 때 필수). settings.local.json mcpServers 키와 일치해야 한다."
         },
+        "mcp_tool_name": {
+          "type": "string",
+          "description": "v0.8.0+. MCP server 가 제공하는 tool 이름. 생략 시 역할 이름에서 유추 (예: architect → architect_deliberate)."
+        },
         "model": { "type": "string" },
         "endpoint": { "type": "string", "format": "uri" },
         "timeout_sec": { "type": "integer", "minimum": 1 },
-        "enabled": { "type": "boolean", "default": true }
+        "enabled": { "type": "boolean", "default": true },
+        "transport_chain": {
+          "type": "array",
+          "description": "v0.8.0+. 다단 Transport 폴백 체인. 각 항목은 순서대로 시도되고 실패 시 다음으로 폴백한다. Transport 구현은 CONTRACT.md §8.8 참조. 체인이 선언되면 본 객체의 단일 transport/model 은 무시된다.",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/transportStep" }
+        }
+      }
+    },
+    "transportStep": {
+      "type": "object",
+      "required": ["transport"],
+      "description": "v0.8.0+. transport_chain 의 한 단계. CONTRACT.md §8.8 Transport Fallback Chain Protocol 참조.",
+      "properties": {
+        "transport": {
+          "type": "string",
+          "enum": ["claude-subagent", "ollama", "mcp"],
+          "description": "gemini 은 enum 에서 제외 (v0.6.0 구조적 폐지). MCP server 경유로만 Gemini 호출."
+        },
+        "mcp_server_name": { "type": "string" },
+        "mcp_tool_name": { "type": "string" },
+        "model": { "type": "string" },
+        "endpoint": { "type": "string", "format": "uri" },
+        "timeout_sec": { "type": "integer", "minimum": 1 }
       }
     }
   }

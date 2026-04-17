@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-04-17
+
+### Added (Debate/Audit 분리 원칙 — unanimous 만장일치)
+
+- **`final-auditor` Performer 신설**. Claude `opus` 전용, Phase 3 전용, Phase 1 토론 불참. 모든 수정 preset(`feature`/`bugfix`/`refactor`) 의 `audit.auditors` 체인 마지막에 자동 배치되어 **만장일치 판정자** 역할을 수행한다. `agents/final-auditor.md` 신규 생성.
+- **만장일치(unanimous) 정의**. Phase 1 Synthesis 합의율 ≥ 70% AND `final-auditor.verdict == pass` 둘 다 충족할 때만 `unanimous: true`. "100% agree" 엄격 해석은 의도적으로 채택하지 않음 — Rework 루프 폭발 방지 (`CONTRACT.md §11.3.2`).
+- **Final Audit Rework (별도 카운터, 상한 1회)**. 전문 감사자 Rework(상한 2회) 와 분리. opus 호출 비용을 제어하기 위해 final-auditor 의 `rework` 판정은 1회만 Phase 1 복귀, 이후에는 파이프라인 중단 + 사용자 판정 (`§11.3.3`).
+- **`CONTRACT.md §8.8 Transport Fallback Chain Protocol`** 신설. v0.7.0 의 architect 전용 3단 폴백을 **모든 Performer 에 적용 가능한 일반 프로토콜** 로 승격. `performerConfig.transport_chain` 배열 필드 + 공통 실행 루프 + 단계별 Health Check 표 + `external_first` 토글 + tool 이름 유추 규칙.
+- **`developer_deliberate` MCP tool**. `mcp-servers/gemini-architect/server.py` 가 v0.8.0 부터 2개 tool 을 노출한다: 기존 `architect_deliberate` (기본 `gemini-2.5-flash`) + 신규 `developer_deliberate` (기본 `gemini-2.5-pro`). 단일 MCP server 프로세스가 두 역할을 모두 처리 (파일 중복 방지).
+- **`userConfig.developer_transport` opt-in 필드**. `plugin.json` 에 추가. 값 `"external"` 설정 시 developer Performer 가 MCP(gemini-2.5-pro) → Ollama(gpt-oss:20b) → Claude(sonnet) 3단 체인으로 전환. 기본값은 Claude sonnet (Phase 2 실행자와 모델 계열 일치, Plan→실행 간극 최소).
+- **`schemas/config.json`** 에 `transport_chain`, `transportStep`, `external_first`, `mcp_tool_name` 필드 추가. `transport: "gemini"` 는 `transportStep` enum 에서 제외 (v0.6.0 구조적 폐지 원칙 유지 — Gemini 호출은 MCP 경유로만 허용).
+
+### Changed (Debate tier — opus 제거)
+
+- **planner 모델 강등: `opus` → `sonnet`**. 토론 Performer 전체에서 opus 사용을 금지선으로 규정. 요구사항 해석 정확도는 sonnet 에서도 충분히 확보되며, opus 는 Phase 3 final-auditor 에 단 1회 집중적으로 사용된다.
+- **Phase 3 감사 순서 2단계화**. `presets/feature.yaml`, `presets/refactor.yaml`, `presets/bugfix.yaml` 의 `audit.auditors` 에 `final-auditor` 를 마지막 항목으로 추가. 전문 감사자 전원 `pass` 직후에만 final-auditor 호출 (전문 `fail` 시 final-auditor 미호출 — opus 비용 절감). 읽기 전용 preset(`security-audit`/`source-analysis`) 은 audit 자체가 off 이므로 final-auditor 도 해당 없음.
+- **feature preset audit 에서 planner 제거**. v0.8.0 부터 planner 는 Phase 3 감사에 참여하지 않는다. 요구사항 충족 여부는 final-auditor 가 큰 그림으로 종합 판정.
+- **LLM 호출 배지 확장**. `agents/orchestrator.md` + `skills/run/SKILL.md` 배지에 Phase 3 예정 순서를 추가 출력. `[⚖ opus ] final-auditor` 로 최종 판정자 위치 강조.
+- **`agents/architect.md` Transport 섹션**. §8.8 Transport Fallback Chain Protocol 참조로 서술 재정리 (코드 경로는 §8.8 공통 루프에 흡수되었고, architect 전용 체인은 §8.8.6 의 예시로 재해석).
+- **`agents/developer.md`**. Transport 섹션 신설. 기본값 Claude sonnet 유지 + opt-in 외부 체인 선언 규약.
+- **`.claude-plugin/plugin.json` / `marketplace.json` / `README.md`**: version 0.7.2 → 0.8.0. README Performer 표 및 프리셋 매트릭스 Debate/Audit split 반영.
+
+### Security
+
+- `final-auditor` 의 Transport 를 `claude-subagent` 로 고정 (외부 이관 금지). v0.6.0 이후 유지된 "Ensembra 파이프라인은 토론 단계에 시크릿을 요구하지 않는다" 원칙은 그대로 유지 — architect 의 MCP 경유 Gemini 호출 방식 (`sensitive: true` + MCP server env-only) 은 변경 없음.
+- v0.8.0 은 opus 토큰 집중 사용 지점이 명확히 1곳(final-auditor) 으로 한정되어, 사용량 감사·요금 통제가 용이.
+
+### Migration
+
+기존 v0.7.2 사용자:
+1. 플러그인 업데이트 후 `/reload-plugins`
+2. config 파일을 수동 편집하지 않으면 자동으로 v0.8.0 기본값이 적용됨 (planner sonnet, final-auditor 자동 배치)
+3. `developer_transport: "external"` 를 원하면 `/plugin → ensembra → Configure options` 에서 명시 설정
+4. 기존 `performers.architect.transport` 단일 선언은 호환 유지 (§8.8.6). `transport_chain` 선언이 우선하나 미선언 시 기존 3단 폴백 동작 그대로
+
+### Design rationale (Debate/Audit 분리)
+
+기존 구조(v0.7.x) 는 planner(opus) + developer(sonnet) + devils(haiku) + scribe(sonnet) 등 토론 6명 중 1~2명이 opus 를 사용하고 Phase 3 감사도 전문 감사자 다수가 각자 병행 판정했다. 이 구조의 문제:
+
+1. opus 가 토론 중간에 투입되면 다른 sonnet/외부 모델 의견을 과도하게 압도 — 토론의 다양성 손실
+2. 감사 단계에서 여러 전문가가 각자 pass/fail 내는 방식은 "다수결" 에 가깝지 "만장일치" 가 아님
+3. opus 호출 비용이 파이프라인 전역에 분산되어 예측·통제 어려움
+
+v0.8.0 은 **토론은 외부 LLM + sonnet 이하 다양성 조합**, **감사는 opus 1명이 큰 그림 종합** 이라는 구조로 재편. 이 분리는:
+
+- 토론: 모델 편향·쏠림 방지 (동형 모델 군집 회피)
+- 감사: 최상위 모델 1명 = 일관된 기준 + 비용 예측 가능
+- 만장일치: 70% 합의 + opus pass 라는 2단 조건으로 "실질적 만장일치" 조작적 정의
+
+"100% agree" 를 쓰지 않는 이유는 실무 실행 가능성 — 6명이 모두 동의하는 상태는 현실적으로 Rework 루프를 폭증시킨다.
+
 ## [0.7.2] — 2026-04-17
 
 ### Fixed (marketplace portability)

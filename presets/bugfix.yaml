@@ -18,7 +18,9 @@ phase2:
 
 phase3:
   audit: true
-  auditors: [qa, security]  # 회귀·보안 중심
+  # v0.8.0+: 회귀·보안 전문 감사 → final-auditor(만장일치 판정).
+  auditors: [qa, security, final-auditor]
+  final_auditor: final-auditor  # 만장일치 판정자. CONTRACT.md §11.3
 
 phase4:
   document: true
