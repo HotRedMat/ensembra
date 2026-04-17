@@ -179,7 +179,7 @@ Quick Select: **Maximum** (default) / Strong / Balanced / Advisory / Off. Custom
 `v0.8.0` is fully verified at the structural and behavioral level:
 
 - `claude plugin validate` passes
-- All 8 agents invoked individually in live sessions
+- All 9 agents invoked individually in live sessions (6 debate performers + scribe + orchestrator + final-auditor)
 - End-to-end runs on `feature`, `bugfix`, `refactor`, `security-audit`, `source-analysis` presets
 - `transfer` generated a 528-line handover document for the Ensembra project itself
 - `/ensembra:report daily|weekly` handles both populated and empty-week states

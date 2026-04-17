@@ -9,7 +9,7 @@
   "properties": {
     "role": {
       "type": "string",
-      "enum": ["planner", "architect", "developer", "security", "qa", "devils-advocate", "scribe"]
+      "enum": ["planner", "architect", "developer", "security", "qa", "devils-advocate", "scribe", "final-auditor"]
     },
     "round": {
       "type": "string",
@@ -121,6 +121,16 @@
       "type": "array",
       "items": { "type": "string" },
       "description": "Phase 3 Audit 에서 verdict=fail/rework 시 요구 변경"
+    },
+    "unanimous": {
+      "type": "boolean",
+      "description": "v0.8.0+. Phase 3 final-auditor 출력 전용. Phase 1 Synthesis 합의율 ≥ 70% AND final-auditor.verdict == 'pass' 일 때 true. CONTRACT.md §11.3.2 참조. optional — 기존 Performer 출력 호환."
+    },
+    "consensus_rate": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "v0.8.0+. Phase 3 final-auditor 출력 전용. Phase 1 Synthesis 합의율 (0~100). optional — 기존 Performer 출력 호환."
     },
     "_error": {
       "type": "object",
