@@ -5,6 +5,13 @@ description: |
   v0.8.0 final-auditor opus 불변식을 pro-plan 에서는 완화 (sonnet/Gemini pro 허용).
   대상: Claude Pro 플랜의 5시간 토큰 한도 내 다수 작업 수행.
 
+  v0.10.0+ Ollama 모델 동적 선택:
+    아래 transport_routing 의 ollama 라인 model 값(qwen2.5:14b 등) 은 backward-compat
+    fallback 이다. ensembra_config.transports.ollama.model (default) 또는
+    ollama.models.{role} (역할별 override) 가 설정되어 있으면 우선 적용된다.
+    의도적 special model (예: developer 의 gpt-oss:20b) 은 yaml 값이 그대로 사용된다.
+    skills/run/SKILL.md 의 "Ollama 모델 해석 우선순위" 섹션 참조.
+
 plan_tier: pro
 
 # 각 Performer 의 Transport Fallback Chain. 순서대로 시도, 실패 시 다음으로 폴백.

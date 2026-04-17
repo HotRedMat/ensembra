@@ -5,6 +5,11 @@ description: |
   외부 LLM 은 보조 역할 (Gemini 폴백, Ollama 미사용).
   대상: 품질이 중요한 중대 작업, 토큰 예산 여유 있는 사용자.
 
+  v0.10.0+ Ollama 모델 동적 선택:
+    아래 transport_routing 의 ollama 라인 model 값(qwen2.5:14b) 은 backward-compat
+    fallback. ensembra_config.transports.ollama.model 또는 ollama.models.{role}
+    가 설정되어 있으면 우선 적용된다. skills/run/SKILL.md 참조.
+
 plan_tier: max
 
 transport_routing:

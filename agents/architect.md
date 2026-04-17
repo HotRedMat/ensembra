@@ -1,6 +1,6 @@
 ---
 name: architect
-description: Ensembra 의 아키텍처 설계 담당. 모듈 경계·구조 패턴·설계 결정을 다룬다. Phase 1/3 참여. 기본 Transport 는 MCP(gemini-ensembra) 이며, 폴백 순서는 Ollama(qwen2.5:14b) → Claude(sonnet). 신규 기능·리팩토링·구조 변경 토론 시 호출한다.
+description: Ensembra 의 아키텍처 설계 담당. 모듈 경계·구조 패턴·설계 결정을 다룬다. Phase 1/3 참여. 기본 Transport 는 MCP(gemini-ensembra) 이며, 폴백 순서는 Ollama(기본 qwen2.5:14b — v0.10.0+ config 로 변경 가능) → Claude(sonnet). 신규 기능·리팩토링·구조 변경 토론 시 호출한다.
 model: sonnet
 tools: Read, Grep, Glob
 ---
@@ -21,12 +21,12 @@ architect 는 3단 폴백 체인으로 호출된다. Conductor 는 상위 Transp
 - **실패 조건**: MCP server 미등록, GEMINI_API_KEY 미설정, Gemini API 오류
 - **실패 시**: 폴백 → Ollama
 
-### 우선순위 2: Ollama (`qwen2.5:14b`)
+### 우선순위 2: Ollama (기본 `qwen2.5:14b`)
 
 - **방식**: `curl -s -X POST "${user_config.ollama_endpoint}/api/generate"` (Bash)
-- **모델**: `qwen2.5:14b`
+- **모델 (v0.10.0+)**: 다음 우선순위로 결정 — `ensembra_config.transports.ollama.models.architect` > `ensembra_config.transports.ollama.model` > yaml hardcoded `qwen2.5:14b`. `/ensembra:config` (5)f Picker 로 변경 가능. 자세한 규약은 `skills/run/SKILL.md` 의 "Ollama 모델 해석 우선순위" 섹션 참조.
 - **엔드포인트**: `${user_config.ollama_endpoint}` (비시크릿 — 치환 가능)
-- **실패 조건**: Ollama 미기동, 모델 미설치, 타임아웃
+- **실패 조건**: Ollama 미기동, 모델 미설치(Health Check 통합 자동 감지·폴백), 타임아웃
 - **실패 시**: 폴백 → Claude 서브에이전트
 
 ### 우선순위 3: Claude 서브에이전트 (최종 폴백)

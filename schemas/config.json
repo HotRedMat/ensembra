@@ -203,8 +203,18 @@
       "properties": {
         "ollama": {
           "type": "object",
+          "description": "Ollama transport 설정. v0.10.0+ 모델 동적 선택 지원.",
           "properties": {
-            "endpoint": { "type": "string", "format": "uri", "default": "http://localhost:11434" }
+            "endpoint": { "type": "string", "format": "uri", "default": "http://localhost:11434" },
+            "model": {
+              "type": "string",
+              "description": "v0.10.0+. 모든 역할 공통 default Ollama 모델. 이 값이 설정되면 profiles/*.yaml 의 hardcoded model 을 override 한다 (developer 의 gpt-oss:20b 같이 명시적으로 다른 모델은 예외 — § models 참조). 미설정 시 yaml hardcoded 사용 (backward compat)."
+            },
+            "models": {
+              "type": "object",
+              "description": "v0.10.0+. 역할별 Ollama 모델 override 매핑. 우선순위: models.{role} > model > yaml hardcoded. 키는 Performer 역할 이름 (planner/architect/developer/security/qa/devils-advocate/scribe). 값은 ollama 가 가진 모델 ID (예: 'qwen2.5-coder:14b'). 비어있는 객체면 모든 역할이 model 또는 yaml 기본값 사용.",
+              "additionalProperties": { "type": "string" }
+            }
           }
         },
         "gemini": {

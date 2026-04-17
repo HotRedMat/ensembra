@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-04-17 (Ollama 모델 동적 선택 — default + 역할별 override)
+
+### Added — 사용자가 설치된 모델을 picker 로 선택
+
+**문제 인식**: v0.9.x 까지 모든 Ollama 호출이 `qwen2.5:14b` 로 hardcoded → 사용자가 다른 모델(`qwen2.5-coder:14b`, `gpt-oss:20b` 등) 을 쓰려면 `profiles/*.yaml` 직접 편집 필요. 마켓 사용자에게 큰 진입 장벽.
+
+#### A. `transports.ollama.model` (default) + `transports.ollama.models.{role}` (override)
+
+`schemas/config.json` 의 `transports.ollama` 섹션 확장:
+```json
+"ollama": {
+  "endpoint": "http://localhost:11434",
+  "model": "qwen2.5-coder:14b",        // 모든 역할 default
+  "models": {                           // 선택적 역할별 override
+    "security": "qwen2.5:14b",
+    "qa": "qwen2.5:14b"
+  }
+}
+```
+
+- 두 모드를 한 데이터 모델로 통합 — 단일 default 만 쓰거나, default 위에 역할별 override 추가하거나
+- 미설정 시 `profiles/*.yaml` 의 hardcoded model 사용 (backward compat)
+
+#### B. `/ensembra:config` (5)f Ollama 모델 picker
+
+`Bash curl ${ollama_endpoint}/api/tags` 실시간 호출 → 설치된 모델 목록 번호 선택. 6 작업 메뉴 (기본 변경 / override 추가 / override 제거 / 전체 override 제거 / 다시 fetch / Ollama 비활성). 저장 직전 자동 검증으로 미설치 모델 감지.
+
+#### C. Phase 1 Health Check 통합
+
+기존 Health Check 의 "Ollama: `/api/tags` 200" 검사 확장:
+- 각 Performer 의 `resolved_model` 이 응답의 `models[].name` 에 존재하는지 확인
+- 미설치 시 자동 fallback (같은 패밀리 14b 모델) 또는 Claude 단계로 직행 + 사용자 알림
+
+#### D. Special-case 보존
+
+profile yaml 의 hardcoded model 이 명시적으로 다른 모델인 경우 (예: pro-plan 의 developer = `gpt-oss:20b`), config default 가 설정되어 있어도 **role-specific override 가 없으면 yaml 값 우선 존중**. 의도적 설계 선택을 보호.
+
+### Changed
+
+- `skills/run/SKILL.md` 의 Transport 호출 규약에 "Ollama 모델 해석 우선순위" 섹션 추가
+- `skills/config/SKILL.md` (5) Transports 서브메뉴에 (5)f 항목 추가
+- `agents/{architect,security,qa}.md` description 갱신 — "기본 qwen2.5:14b — v0.10.0+ config 로 변경 가능"
+- `profiles/{pro,max}-plan.yaml` description 에 v0.10.0+ 안내 추가 (실제 model 라인은 backward compat 위해 유지)
+- `schemas/config.json` 의 `transports.ollama` 에 `model`, `models` 필드 정의 추가
+
+### Backward Compatibility
+
+- `transports.ollama.model` 미설정 → 기존 동작 그대로 (`qwen2.5:14b` 사용)
+- 기존 사용자 무중단 마이그레이션 — `/ensembra:config` 한 번 실행으로 신 기능 활용 가능
+
 ## [0.9.3] — 2026-04-17 (폴백 승인 프로토콜 — 예상치 못한 Claude 토큰 소비 차단)
 
 ### Added — 폴백 승인 3종 메커니즘

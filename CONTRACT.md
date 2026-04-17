@@ -531,6 +531,42 @@ scribe 가 생성하는 Task Report (`docs/reports/tasks/{YYYY-MM-DD}-{slug}.md`
 - 비활성화 시 §8.6.5 의 4종 전부 억제. §8.6.1~§8.6.4 Live Indicators 는 `show_transport_badge` 로 별도 토글
 - 두 설정 모두 비활성화해도 Task Report 의 기본 "## 외부 LLM 사용 증거" 섹션은 **쓰기 전용 기본값으로 유지** (사후 감사 보장). 섹션 자체를 숨기려면 `reports.task_report_proof_section: false` 명시 필요 (비권장)
 
+### 8.10 Ollama 모델 해석 우선순위 (v0.10.0+)
+
+Phase 1 ollama 단계 진입 직전 Conductor 는 다음 우선순위로 모델을 결정한다:
+
+```
+1. ensembra_config.transports.ollama.models.{role}   ← 역할별 override
+2. ensembra_config.transports.ollama.model           ← default
+3. profiles/{profile}.yaml 의 transport_routing.{role}.chain[].model  ← yaml hardcoded
+```
+
+**Special-case 보존**: yaml hardcoded model 이 명시적으로 다른 모델인 경우 (예: pro-plan 의 developer = `gpt-oss:20b`), config 의 default (2단계) 가 설정되어 있어도 **role-specific override (1단계) 가 없으면 yaml 값을 우선 존중**. 이는 의도적 설계 선택을 보호한다.
+
+| 시나리오 | config.json | yaml | resolved |
+|---|---|---|---|
+| config 미설정 | `{}` | `qwen2.5:14b` | `qwen2.5:14b` (yaml) |
+| default 만 설정 | `{ollama:{model:"qwen2.5-coder:14b"}}` | `qwen2.5:14b` | `qwen2.5-coder:14b` (default) |
+| role override | `{ollama:{models:{architect:"qwen2.5-coder:14b"}}}` | `qwen2.5:14b` | architect → `qwen2.5-coder:14b`, 그 외 → `qwen2.5:14b` |
+| Special-case (developer) | `{ollama:{model:"qwen2.5-coder:14b"}}` | `gpt-oss:20b` (developer) | `gpt-oss:20b` (yaml 우선) |
+| Override + special | `{ollama:{models:{developer:"qwen2.5-coder:14b"}}}` | `gpt-oss:20b` (developer) | `qwen2.5-coder:14b` (override) |
+
+설정·picker 는 `/ensembra:config` (5)f, 호출 부 규약은 `skills/run/SKILL.md` 의 "Ollama 모델 해석 우선순위" 섹션 참조.
+
+#### Phase 1 Health Check 통합 (§8.9.2 확장)
+
+Health Check 의 "Ollama: `/api/tags` 200" 검사 시, 각 Performer 의 `resolved_model` 이 응답의 `models[].name` 에 존재하는지 확인. 미설치 시:
+
+```
+[1] 자동: 같은 패밀리 14b 모델 임시 폴백
+[2] 임시 폴백 후보 없음: 해당 역할 ollama 단계 스킵 → Claude 폴백
+[3] 사용자 알림 (`/ensembra:config` 또는 `ollama pull` 안내)
+```
+
+`fallback.confirmation_mode == strict` 면 사용자 승인 프롬프트, 그 외에는 자동 처리 + 배지 알림.
+
+---
+
 ### 8.9 폴백 승인 프로토콜 (v0.9.3+)
 
 외부 LLM (MCP/Ollama) 실패 → Claude 폴백 발생 시 사용자 명시적 승인을 요구하는 프로토콜. 예상치 못한 Claude 토큰 소비 사전 차단.

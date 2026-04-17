@@ -424,8 +424,18 @@ Stage B 점수: 18 (변동 +13)
 Phase 1 R1 시작 **직전** `fallback.batch_by_phase: true` (기본) 일 때 모든 외부 Transport 에 대해 Health Check 일괄 수행 (`CONTRACT.md §8.9` 참조):
 
 1. Gemini MCP: `tools/list` 로 서버 응답 확인 (300초 TTL 캐시)
-2. Ollama: `GET {endpoint}/api/tags` 200 + 모델 존재
+2. Ollama: `GET {endpoint}/api/tags` 200 + **각 Performer 의 resolved_model 이 응답의 `models[].name` 에 존재** (v0.10.0+ 모델 동적 선택과 통합 검증)
 3. Rate limit 근접 감지: Gemini API 응답 헤더의 `X-RateLimit-Remaining` 체크 (14/15 RPM 이하 시 ⓘ 배지)
+
+**Ollama 모델 미설치 처리** (v0.10.0+): `transports.ollama.model` 또는 `transports.ollama.models.{role}` 에 명시된 모델이 `/api/tags` 결과에 없으면 다음 순으로 처리:
+
+```
+[1] 자동: 같은 패밀리 14b 모델 중 하나로 임시 폴백 (예: qwen2.5-coder:14b 미설치 → qwen2.5:14b 가 있으면 사용)
+[2] 임시 폴백 후보 없음: 해당 역할만 ollama 단계 스킵 → Claude 폴백 진행
+[3] 사용자 알림: "⚠ architect 의 config 모델 'qwen2.5-coder:14b' 가 미설치. 'qwen2.5:14b' 로 임시 폴백. /ensembra:config 에서 변경 또는 `ollama pull qwen2.5-coder:14b` 권장."
+```
+
+이 동작은 `fallback.confirmation_mode == strict` 일 때만 사용자 승인 프롬프트, 그 외 모드에서는 자동 처리 + 배지 알림.
 
 **사전 경고 배지 출력**:
 ```
@@ -494,8 +504,37 @@ MCP 가용 실패 시 (MCP server 미등록, GEMINI_API_KEY 미설정, Gemini AP
 # endpoint 가 비어 있지 않을 때만 호출
 curl -s -X POST "${user_config.ollama_endpoint}/api/generate" \
   -H 'Content-Type: application/json' \
-  -d "{\"model\":\"qwen2.5:14b\",\"prompt\":\"$prompt\",\"stream\":false}"
+  -d "{\"model\":\"<resolved_model>\",\"prompt\":\"$prompt\",\"stream\":false}"
 ```
+
+#### Ollama 모델 해석 우선순위 (v0.10.0+)
+
+`<resolved_model>` 값은 Conductor 가 ollama 단계 진입 직전 다음 우선순위로 결정한다 (`/ensembra:config` (5)f Picker 와 동일 규약):
+
+```
+1. ensembra_config.transports.ollama.models.{role}   ← 역할별 override (config.json)
+2. ensembra_config.transports.ollama.model           ← default (config.json)
+3. profiles/{profile}.yaml 의 transport_routing.{role}.chain[].model  ← yaml hardcoded (backward compat)
+```
+
+각 단계는 "값이 비어있지 않은 첫 항목"을 채택한다. 예시:
+
+| 시나리오 | config.json | yaml | 결정된 모델 |
+|---|---|---|---|
+| config 미설정 | `{}` | `qwen2.5:14b` | `qwen2.5:14b` (yaml) |
+| default 만 | `{ollama:{model:"qwen2.5-coder:14b"}}` | `qwen2.5:14b` | `qwen2.5-coder:14b` (default) |
+| 역할별 override | `{ollama:{model:"qwen2.5:14b", models:{architect:"qwen2.5-coder:14b"}}}` | `qwen2.5:14b` | architect → `qwen2.5-coder:14b`, 그 외 → `qwen2.5:14b` |
+
+**예외**: profile yaml 의 hardcoded model 이 `gpt-oss:20b` 같이 명시적으로 다른 모델인 경우 (예: pro-plan 의 developer), 이는 의도적 설계 선택이다. 따라서 default 가 설정되어 있어도 **role-specific override 가 없으면 yaml 값을 우선 존중**한다 (default 적용 X).
+
+자세히는:
+```
+1. ensembra_config.transports.ollama.models.{role}                      → 명시적 override 면 사용
+2. yaml 의 model 이 default(qwen2.5:14b) 인 경우만 ensembra_config.transports.ollama.model 적용
+3. yaml 의 model 이 다른 명시적 값(gpt-oss:20b 등) 이면 그대로 사용
+```
+
+이 규약으로 backward compat + 단순 이주 (`/ensembra:config` 한 번 설정만으로 일괄 적용) + 의도적 special-case (developer=gpt-oss) 보존 3가지를 동시 만족.
 
 **3단: Claude 서브에이전트 (최종 폴백)**
 

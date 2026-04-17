@@ -77,6 +77,7 @@ q) 저장 후 종료
 - b) Ollama health check → `curl -s /api/tags`
 - c) Claude 폴백 모델 선택
 - d) Gemini MCP 상태 확인 → `settings.local.json` 에 `mcpServers.gemini-ensembra` 등록 여부 표시 + MCP server health check
+- f) **Ollama 모델 (v0.10.0+)** — default + 역할별 override 통합 picker (아래 §(5)f)
 
 #### (5)c Claude 폴백 모델
 Ollama 불가 시 architect/security/qa 가 사용할 Claude 모델 선택 (opus/sonnet/haiku).
@@ -91,6 +92,106 @@ v0.6.0 에서 제거되었던 Gemini 서브메뉴가 v0.7.0 에서 MCP 기반으
 - API 키 설정 여부: **`gemini_api_key` 값 자체를 읽지 않고**, MCP server 에 health check 호출을 보내 간접 확인
 
 **불변식**: picker 는 `gemini_api_key` 를 **절대 읽지·쓰지·길이 측정도 하지 않는다**. 키 설정은 `/plugin → ensembra → Configure options` 에서만 가능.
+
+### (5)f Ollama 모델 — default + 역할별 override (v0.10.0+)
+
+`transports.ollama.model` (default) 와 `transports.ollama.models` (역할별 override) 를 통합 관리한다. **하나의 picker 에서 단일 운영과 역할별 매핑을 모두 커버**한다.
+
+#### 진입 시 표시
+
+```
+Ensembra > Transports > Ollama 모델 (v0.10.0+)
+──────────────────────────────────────────────────
+설치된 모델 fetch 중... (curl ${ollama_endpoint}/api/tags)
+```
+
+`/api/tags` 호출 후:
+
+```
+설치된 모델 (4개):
+  q1) qwen2.5-coder:14b   9.0GB   modified 2026-04-17
+  q2) qwen2.5:14b         8.9GB   modified 2026-04-15
+  q3) gpt-oss:20b         13.7GB  modified 2026-01-07
+  q4) llama3.1:8b         4.9GB   modified 2026-04-15
+
+현재 설정:
+  default:  qwen2.5:14b               (모든 역할 공통)
+  override: 없음                       (또는 architect=qwen2.5-coder:14b ...)
+
+작업:
+  1) 기본 모델 변경 (모든 역할에 영향, override 는 유지)
+  2) 역할별 override 추가/변경
+  3) 역할별 override 제거 (선택 역할 → default 로 복귀)
+  4) 모든 override 제거 (단일 모델로 통일)
+  5) 설치된 모델 다시 fetch
+  6) Ollama transport 비활성 (Conductor 가 yaml hardcoded 사용)
+  9) 저장 후 상위 메뉴
+  0) 취소
+```
+
+#### 작업별 동작
+
+**[1] 기본 모델 변경**:
+```
+q1~q4 중 default 로 사용할 모델 번호 입력: 1
+→ transports.ollama.model = "qwen2.5-coder:14b"
+```
+
+**[2] 역할별 override 추가/변경**:
+```
+역할 선택:
+  r1) planner
+  r2) architect
+  r3) developer
+  r4) security
+  r5) qa
+  r6) devils-advocate
+  r7) scribe
+번호 (또는 r2,r4 같이 다중): r2
+모델 번호 (q1~q4): 1
+→ transports.ollama.models.architect = "qwen2.5-coder:14b"
+```
+
+**[3] 역할별 override 제거**:
+현재 override 된 역할 목록 표시 → 번호 선택 → 해당 키 삭제 → 다음 호출부터 default 적용.
+
+**[4] 모든 override 제거**:
+`transports.ollama.models = {}` 로 초기화. default 만 남음.
+
+**[6] Ollama transport 비활성**:
+`transports.ollama.endpoint` 를 빈 문자열로 설정. skills/run/SKILL.md 의 Transport 호출 규약에 따라 Ollama 단계 자체가 스킵되고 Claude 단계로 직행.
+
+#### 우선순위 (skills/run/SKILL.md 참조)
+
+Conductor 는 Phase 1 진입 시 ollama transport 호출 직전 다음 우선순위로 모델을 결정:
+
+```
+1. transports.ollama.models.{role}      ← config 에 명시되어 있으면
+2. transports.ollama.model              ← default 가 설정되어 있으면
+3. profiles/*.yaml 의 hardcoded model   ← 둘 다 없으면 (backward compat)
+```
+
+#### Health Check 통합
+
+저장 직전 `transports.ollama.model` + 모든 `transports.ollama.models.*` 값이 fetch 결과(`/api/tags` 응답)에 존재하는지 검증. 미설치 모델 발견 시:
+
+```
+⚠ 다음 모델이 Ollama 에 설치되어 있지 않습니다:
+  - architect: qwen2.5-coder:14b   ← 미설치
+
+  [1] 그대로 저장 (실행 시 Health Check 가 폴백 처리)
+  [2] override 제거 (default 로 복귀)
+  [3] 다른 모델로 변경
+  [4] `ollama pull qwen2.5-coder:14b` 명령 안내 후 재검증
+```
+
+#### 보안
+
+- 모델 이름은 비시크릿 — config.json 에 그대로 저장
+- `/api/tags` 응답에 시크릿 없음 (모델명·크기·해시만)
+- 마스킹 대상 아님
+
+---
 
 ### (5)e Fallback 승인 프로토콜 (v0.9.3+)
 
