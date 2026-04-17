@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/HotRedMat/ensembra/releases"><img src="https://img.shields.io/badge/version-0.8.1-blue" alt="version"/></a>
+  <a href="https://github.com/HotRedMat/ensembra/releases"><img src="https://img.shields.io/badge/version-0.9.0-blue" alt="version"/></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="license"/></a>
   <img src="https://img.shields.io/badge/plugin%20validate-passing-brightgreen" alt="plugin validate"/>
   <img src="https://img.shields.io/badge/verification-end--to--end-brightgreen" alt="verification"/>
@@ -69,7 +69,7 @@ v0.8.0 splits Performers into three tiers. **Opus is forbidden in debate** and u
 | 🏛 **architect** | Module boundaries, patterns | MCP (Gemini) → Ollama → Claude | `gemini-2.5-flash` |
 | 🛠 **developer** | Implementation strategy | Claude sub-agent (opt-in external chain) | `sonnet` |
 | 🛡 **security** | Threats, secrets, OWASP | Ollama → Claude | `qwen2.5:14b` |
-| 🧪 **qa** | Edge cases, regression | Ollama → Claude | `llama3.1:8b` |
+| 🧪 **qa** | Edge cases, regression | Ollama → Claude | `qwen2.5:14b` |
 | 😈 **devils-advocate** | Counter-arguments, YAGNI | Claude sub-agent | `haiku` |
 
 **Audit (Phase 3) — specialist auditors → final-auditor:**
@@ -126,7 +126,7 @@ claude plugin install ensembra@ensembra
 ### Ollama setup (optional, for security/qa)
 
 ```bash
-ollama pull qwen2.5:14b llama3.1:8b
+ollama pull qwen2.5:14b
 ```
 
 ### Gemini setup for architect (v0.7.0+, optional)
@@ -140,7 +140,7 @@ That's it — no manual `settings.local.json` editing needed. If Gemini is unava
 
 ### Prerequisites per platform
 
-The MCP server (`mcp-servers/gemini-architect/server.py`) runs under `python3` and uses only the Python standard library — no `pip install` required. Platform notes:
+The MCP server (`mcp-servers/gemini-ensembra/server.py`) runs under `python3` and uses only the Python standard library — no `pip install` required. Platform notes:
 
 | OS | Status | Keychain backend | Notes |
 |---|---|---|---|
@@ -180,13 +180,14 @@ Quick Select: **Maximum** (default) / Strong / Balanced / Advisory / Off. Custom
 
 - `claude plugin validate` passes
 - All 9 agents invoked individually in live sessions (6 debate performers + scribe + orchestrator + final-auditor)
-- End-to-end runs on `feature`, `bugfix`, `refactor`, `security-audit`, `source-analysis` presets
+- End-to-end runs on `feature`, `bugfix`, `refactor`, `security-audit`, `source-analysis` presets (v0.9.0+ adds `ops`, `ops-safe` for operations work — pending Stage 4 verification)
 - `transfer` generated a 528-line handover document for the Ensembra project itself
 - `/ensembra:report daily|weekly` handles both populated and empty-week states
 - **Rework loop** triggered twice on an intentionally-weak email validator, converging on pass with 19 tests
 - **Halt-on-low-consensus** triggered on a deliberately controversial refactor request (0% consensus, pipeline stopped before Phase 2)
 - **Ensembra's `source-analysis` preset caught 4 real drift bugs in Ensembra's own code** — the strongest possible proof that the plugin catches real bugs
-- **All three transports verified end-to-end**: Ollama (`qwen2.5:14b`, `llama3.1:8b`), Gemini (`gemini-2.5-flash`), Claude sub-agents
+- **All three transports verified end-to-end**: Ollama (`qwen2.5:14b`), Gemini (`gemini-2.5-flash`), Claude sub-agents
+- **v0.9.0+**: Single MCP server `gemini-ensembra` exposes 9 role-specific tools (architect/planner/developer/security/qa/devils/scribe/final-auditor/triage). One registration, one API key, nine roles.
 
 See [`CHANGELOG.md`](./CHANGELOG.md) for the full verification log.
 

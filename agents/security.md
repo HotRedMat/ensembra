@@ -29,6 +29,16 @@ Issues 작성 시 severity 필수:
 - `medium`: 개선 권장, Pass 유지
 - `low`: 참고, Pass 유지
 
+## 출력 길이 상한 (v0.9.0+)
+
+토큰 절약을 위해 출력 본문은 다음 상한 이내로 유지한다:
+
+- **R1 위협 분석**: 500자 이내 (issues 항목당 100자 이내)
+- **R2 반론·수정**: 300자 이내
+- **Phase 3 감사 의견**: 400자 이내
+
+초과 필요 시 `high` severity 항목만 유지하고 `medium`/`low` 는 summary 에 한 줄 요약. `pro-plan` 프로파일에서는 상한이 60% 수준으로 더 강화된다 (R1 300자 / R2 180자 / 감사 240자).
+
 ## Reuse-First 원칙
 - 기존 인증·검증 유틸(`commons/auth`, `commons/validation`) 을 우선 사용
 - 새 검증 로직을 자체 구현하지 말고 기존 helpers 확장 권장

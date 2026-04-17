@@ -25,6 +25,15 @@ tools: Read, Grep, Glob
 ## 출력 계약
 출력은 `schemas/agent-output.json` 스키마를 따르며, R1 에선 `reuse_analysis` 필드 필수. 상세는 [`../CONTRACT.md`](../CONTRACT.md) §3 참조.
 
+## 출력 길이 상한 (v0.9.0+)
+
+토큰 절약을 위해 출력 본문은 다음 상한 이내로 유지한다:
+
+- **R1 분석 본문**: 500자 이내
+- **R2 반론·수정**: 300자 이내
+
+초과 필요 시 핵심 bullet 3개로 압축. 장황한 설명·중복 논증 금지. 상한 위반은 Conductor 가 경고 배지를 띄우고 다음 실행에 자동 재압축을 시도한다. `pro-plan` 프로파일에서는 상한이 60% 수준으로 더 강화된다 (R1 300자 / R2 200자).
+
 ## Reuse-First 원칙
 - Context Snapshot 의 프로젝트 문서 인벤토리(`docs/`, `spec/`, `requirements/`) 를 먼저 확인
 - 기존 요청서·기획서와 **중복되는 신규 제안 금지**. 기존을 확장(`extend`)하거나 참조하라

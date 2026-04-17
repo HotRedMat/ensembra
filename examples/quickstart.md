@@ -122,10 +122,10 @@ The interactive picker lets you change Performers, Presets, Rounds, Deep Scan it
 ### Ollama (free, local)
 
 ```bash
-ollama pull qwen2.5:14b llama3.1:8b
+ollama pull qwen2.5:14b
 ```
 
-Ensembra will auto-route the security performer to `qwen2.5:14b` and the qa performer to `llama3.1:8b`. If Ollama is unreachable, performers fall back to Claude sub-agents.
+Ensembra will auto-route both the security and qa performers to `qwen2.5:14b` (v0.9.0+: shared model, loaded once in Ollama for memory efficiency — ~9GB instead of ~14.5GB). If Ollama is unreachable, performers fall back to Claude sub-agents.
 
 ### Gemini (free tier)
 

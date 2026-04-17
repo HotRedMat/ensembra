@@ -72,7 +72,7 @@ Ensembra orchestrates **six specialist agents** (planner, architect, developer, 
 
 ## Presets
 
-`feature`, `bugfix`, `refactor`, `security-audit`, `source-analysis`, `transfer`
+`feature`, `bugfix`, `refactor`, `ops` (v0.9.0+), `ops-safe` (v0.9.0+), `security-audit`, `source-analysis`, `transfer`
 
 ## Verification
 
@@ -85,7 +85,7 @@ This release has been verified end-to-end:
 - ✅ **Rework loop triggered twice** on an intentionally-weak email validator, converging on pass with 19 tests
 - ✅ **Halt-on-low-consensus triggered** on a deliberately controversial refactor request (0% consensus, pipeline stopped before Phase 2)
 - ✅ **Ensembra's `source-analysis` found 4 real drift bugs in Ensembra's own code** — the strongest proof of real bug-catching capability
-- ✅ **All three transports verified end-to-end**: Ollama (`qwen2.5:14b`, `llama3.1:8b`), Gemini (`gemini-2.5-flash`), Claude sub-agents
+- ✅ **All three transports verified end-to-end**: Ollama (`qwen2.5:14b`), Gemini (`gemini-2.5-flash`), Claude sub-agents
 
 ## Out of scope
 
@@ -155,9 +155,9 @@ claude plugin install ensembra@ensembra
 
 ### Optional: enable external transports
 
-**Ollama** (for security and qa performers):
+**Ollama** (for security and qa performers, v0.9.0+ shared model):
 \`\`\`bash
-ollama pull qwen2.5:14b llama3.1:8b
+ollama pull qwen2.5:14b
 \`\`\`
 
 **Gemini** (for architect performer):

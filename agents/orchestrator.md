@@ -16,7 +16,7 @@ model: opus
 - 🏛 **architect** (mcp → ollama → claude-subagent / gemini-2.5-flash → qwen2.5:14b → sonnet, §8.8 체인) — 모듈 경계, 구조 패턴
 - 🛠 **developer** (claude-subagent / sonnet, opt-in 외부 체인) — 구현 전략, 패턴·라이브러리 선택
 - 🛡 **security** (ollama → claude-subagent / qwen2.5:14b → sonnet) — 위협 모델, 권한, 시크릿
-- 🧪 **qa** (ollama → claude-subagent / llama3.1:8b → sonnet) — 테스트 전략, 엣지케이스
+- 🧪 **qa** (ollama → claude-subagent / qwen2.5:14b → sonnet) — 테스트 전략, 엣지케이스
 - 😈 **devils-advocate** (claude-subagent / haiku) — 반론, 숨은 가정, 과잉 설계 경고
 
 **감사(Phase 3) Performer**:
@@ -47,9 +47,9 @@ Conductor 는 `config.json logging.show_transport_badge: true` (기본) 일 때 
 
 ```
 📡 Phase 1 R1 — Transport 현황 (v0.8.0+):
-  [Gemini  ] architect     → gemini-2.5-flash  @ MCP(gemini-architect)
+  [Gemini  ] architect     → gemini-2.5-flash  @ MCP(gemini-ensembra)
   [Ollama  ] security      → qwen2.5:14b       @ localhost:11434
-  [Ollama  ] qa            → llama3.1:8b       @ localhost:11434
+  [Ollama  ] qa            → qwen2.5:14b       @ localhost:11434
   [Claude  ] planner       → sonnet            @ subagent
   [Claude  ] developer     → sonnet            @ subagent    (opt-in 외부 체인 off)
   [Claude  ] devils-adv    → haiku             @ subagent
@@ -62,7 +62,7 @@ Conductor 는 `config.json logging.show_transport_badge: true` (기본) 일 때 
 
 레이어 2 실시간 배지 예시 (architect MCP 실패 → Ollama 성공):
 ```
-▶ [Gemini  ] architect — 호출 시작 (gemini-2.5-flash @ MCP(gemini-architect))
+▶ [Gemini  ] architect — 호출 시작 (gemini-2.5-flash @ MCP(gemini-ensembra))
 ⚠ [Gemini  ] architect — HTTP 429 rate limit → Ollama 폴백
 ▶ [Ollama  ] architect — 호출 시작 (qwen2.5:14b @ localhost:11434)
 ◀ [Ollama  ] architect — 응답 수신 (4721ms, 2.3KB)

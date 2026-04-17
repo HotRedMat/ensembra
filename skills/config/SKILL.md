@@ -19,23 +19,27 @@ disable-model-invocation: false
 ## 메인 메뉴
 
 ```
-Ensembra 설정
+Ensembra 설정 (v0.9.0+)
 ──────────────────
-1) Performers         — 역할별 모델 및 활성화 (7명)
-2) Presets            — 프리셋별 구성 (6종)
-3) Rounds             — 합의 임계값, Rework 상한
-4) Deep Scan          — 체크리스트 10항목 (강제 6 + 선택 4)
-5) Transports         — Ollama endpoint, Gemini API 키
-6) Timeouts           — transport 별 타임아웃
-7) Logging            — 마스킹 키, 로그 레벨
-8) Reports            — Phase 4 문서별 on/off, 경로, 언어
-9) Reuse-First Policy — 4개 장치 Quick Select 또는 Custom
-10) Plan Tier         — Claude 플랜 기반 실행 프로파일 (pro/max)
-11) Reset             — 기본값으로 복원
-0) 저장 후 종료
+0)  Profile           — 🆕 Claude 요금제 프로파일 (pro-plan/max-plan/custom)
+1)  Performers        — 역할별 모델 및 활성화 (8명, v0.9.0 final-auditor 포함)
+2)  Presets           — 프리셋별 구성 (8종, v0.9.0+ ops/ops-safe 포함)
+3)  Rounds            — 합의 임계값, Rework 상한
+4)  Deep Scan         — 체크리스트 10항목 (강제 6 + 선택 4)
+5)  Transports        — Ollama endpoint, Gemini API 키
+6)  Timeouts          — transport 별 타임아웃
+7)  Logging           — 마스킹 키, 로그 레벨
+8)  Reports           — Phase 4 문서별 on/off, 경로, 언어
+9)  Reuse-First Policy — 4개 장치 Quick Select 또는 Custom
+10) Plan Tier         — Claude 플랜 기반 실행 tier (pro/max)
+11) Risk Routing      — 🆕 위험 기반 자동 라우팅 (v0.9.0+)
+12) Reset             — 기본값으로 복원
+q) 저장 후 종료
 
 번호를 입력하세요:
 ```
+
+**프로파일 우선순위**: 프로파일(0번) 설정 시 해당 YAML 의 `transport_routing`/`rounds_override`/`phase3_override`/`output_limits_multiplier` 등이 기본값으로 로드된다. 개별 항목을 바꾸면 자동으로 `profile=custom` 으로 전환되고 변경 항목만 `profile_overrides` 에 저장된다 (나머지는 원래 프로파일 값 상속).
 
 사용자 입력을 받으면 해당 서브메뉴로 전이. 각 서브메뉴도 동일 패턴.
 
@@ -45,11 +49,11 @@ Ensembra 설정
 역할 7개 나열 → 선택 → 모델 picker (Live 조회):
 - Ollama: `Bash curl -s http://localhost:11434/api/tags` → `.models[].name`
 - Claude: 정적 목록 (opus/sonnet/haiku + 현재 세션 ID)
-- Gemini: **v0.7.0 에서 MCP 기반 재도입**. `settings.local.json` 에 `mcpServers.gemini-architect` 등록 여부로 가용성 판단. 키는 `/plugin → ensembra → Configure options` 에서 설정 (sensitive:true, picker 가 직접 접근하지 않음)
+- Gemini: **v0.7.0 에서 MCP 기반 재도입**. `settings.local.json` 에 `mcpServers.gemini-ensembra` 등록 여부로 가용성 판단. 키는 `/plugin → ensembra → Configure options` 에서 설정 (sensitive:true, picker 가 직접 접근하지 않음)
 숫자 입력으로 선택.
 
 ### (2) Presets
-프리셋 6개 (feature/bugfix/refactor/security-audit/source-analysis/transfer) 선택 후:
+프리셋 8개 (feature/bugfix/refactor/**ops**/**ops-safe**/security-audit/source-analysis/transfer) 선택 후 (v0.9.0+ ops/ops-safe 신설):
 - a) 참여 Performer 체크박스
 - b) 라운드 구성
 - c) Phase 2 Execute on/off
@@ -72,7 +76,7 @@ Ensembra 설정
 - a) Ollama endpoint (기본 `http://localhost:11434`)
 - b) Ollama health check → `curl -s /api/tags`
 - c) Claude 폴백 모델 선택
-- d) Gemini MCP 상태 확인 → `settings.local.json` 에 `mcpServers.gemini-architect` 등록 여부 표시 + MCP server health check
+- d) Gemini MCP 상태 확인 → `settings.local.json` 에 `mcpServers.gemini-ensembra` 등록 여부 표시 + MCP server health check
 
 #### (5)c Claude 폴백 모델
 Ollama 불가 시 architect/security/qa 가 사용할 Claude 모델 선택 (opus/sonnet/haiku).
@@ -82,7 +86,7 @@ Ollama 불가 시 architect/security/qa 가 사용할 Claude 모델 선택 (opus
 v0.6.0 에서 제거되었던 Gemini 서브메뉴가 v0.7.0 에서 MCP 기반으로 복원됨.
 
 표시 항목:
-- `settings.local.json` 에 `mcpServers.gemini-architect` 등록 여부 (등록됨/미등록)
+- `settings.local.json` 에 `mcpServers.gemini-ensembra` 등록 여부 (등록됨/미등록)
 - MCP server 프로세스 가동 여부 (가동 중/미가동)
 - API 키 설정 여부: **`gemini_api_key` 값 자체를 읽지 않고**, MCP server 에 health check 호출을 보내 간접 확인
 
@@ -163,7 +167,78 @@ Ensembra > Plan Tier
 
 **우선순위**: `/ensembra:run --tier=...` 인자 > 본 설정 > 기본값 `pro`
 
-### (11) Reset
+### (0) Profile — v0.9.0+ 신규
+
+Claude 요금제 기반 통합 프로파일. profiles/{name}.yaml 에서 Transport 체인·출력 상한·정책 완화를 일괄 로드.
+
+```
+Ensembra > Profile (v0.9.0+)
+──────────────────────────────
+현재: pro-plan
+
+1) 🪙 pro-plan  — Claude Pro 플랜 사용자 (비용 최소)
+                 · 모든 Performer 1순위 Gemini/Ollama
+                 · final-auditor: sonnet/Gemini pro 허용 (opus 완화)
+                 · planner/scribe 외부 이관 허용
+                 · 출력 상한 60% 적용
+                 · Phase 3 감사자 2명 (전문 1 + final)
+                 · 예상 Claude API 절감: 85~90%
+                 · 예상 품질 저하: 10~15% (설계·요구사항 해석)
+
+2) 💎 max-plan  — Claude Max5 플랜 사용자 (품질 우선)
+                 · planner/developer/scribe/final-auditor Claude 고정
+                 · opus final-auditor 유지
+                 · 출력 상한 100% 적용
+                 · Phase 3 감사자 preset 전원
+                 · 예상 Claude API 절감: 0~10%
+                 · 품질 저하 없음
+
+3) custom      — profile_overrides 로 개별 항목 수동 지정
+
+9) 저장 후 상위 메뉴
+0) 취소
+```
+
+**우선순위**: `/ensembra:run --profile=...` 인자 > 본 설정 > 기본값 `pro-plan`
+
+**프로파일 전환 영향**:
+- (1) Performers, (2) Presets 의 Transport 체인이 프로파일 YAML 기본값으로 재설정
+- 사용자가 개별 항목을 변경하면 자동으로 `profile=custom` 전환 + `profile_overrides` 에 변경점만 저장
+- (10) Plan Tier 의 값이 프로파일 YAML 의 `plan_tier` 로 자동 동기화
+
+### (11) Risk Routing — v0.9.0+ 신규
+
+요청 텍스트 Triage (Stage A) + Phase 0 Deep Scan 재평가 (Stage B) 로 preset·profile 을 자동 결정.
+
+```
+Ensembra > Risk Routing (v0.9.0+)
+──────────────────────────────
+현재: staged 모드, auto_upgrade=10, notify=3, kill_switch=strict
+
+1) 활성화:                  [x] on / [ ] off
+2) 모드:
+     a) always_ask  — 변동 +3 이상 항상 확인
+     b) staged      — 알림 vs 자동 임계값 분리 (권장)
+     c) aggressive  — 변동 +3 이상 자동 업그레이드
+3) auto_upgrade_threshold   현재 10 (staged 전용)
+4) notify_threshold         현재 3
+5) kill_switch:
+     a) strict  — 치명 신호 감지 시 강제 중단 (기본)
+     b) warn    — 경고만 표시하고 계속
+     c) off     — 비활성화 (비권장)
+6) 위험 키워드 편집 (Critical/High/Paths)
+7) 로그 기록 (runs.jsonl):  [x] on / [ ] off
+
+9) 저장 후 상위 메뉴
+0) 취소
+```
+
+**3단계 적응 권장**:
+- 1~2주 (검증기): `always_ask` 모드 — 시스템 판정을 사용자가 검토
+- 3~4주 (전환기): `staged` 모드 + `auto_upgrade=15` 로 시작
+- 5주 이후 (정상): `staged` 모드 + `auto_upgrade=10` (기본값)
+
+### (12) Reset
 "모든 값을 기본값으로 복원하시겠습니까? (y/n)" 확인 후 진행.
 
 ## 저장

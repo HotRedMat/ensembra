@@ -7,6 +7,96 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-04-17 (토큰 절약 + 프로파일 체계 + 위험 기반 라우팅)
+
+### Added
+
+#### Stage 0 — 사용자 교육
+- **`WHEN_NOT_TO_USE.md`** 신규 추가. Ensembra 를 언제 쓰지 말아야 하는지 판단 기준 제시. 2~3줄 수정·질문·주석은 직접 처리 권장. 위험 키워드·경로 체크리스트 + 실전 Case A~E 예시. 운영업무 15사이트 환경 기준 **일 75건 요청 대응**, 약 60~70% 절감 효과 예상.
+
+#### Stage 1 — 공통 기반
+- **에이전트 출력 길이 상한** (`agents/*.md`). 8개 에이전트(planner/architect/developer/qa/security/devils-advocate/scribe/final-auditor) 각각에 역할별 출력 상한 섹션 추가. R1/R2/Audit 본문 토큰 제한으로 컨텍스트 누적 약 30% 감소 추정.
+- **Phase 0 Reuse 인벤토리 공유** (`skills/run/SKILL.md`). 강제 항목 5(공통 모듈)·선택 항목 5(테스트 맵)·선택 항목 7(의존성) 결과를 Context Snapshot 내 `reuse_inventory` 구조로 전 Performer 공유. Performer 자체 재귀 Read 금지. feature 프리셋 기준 Read tool call 약 60~100건 감소.
+
+#### Stage 1.5 — 운영 프리셋 신설
+- **`ops` 프리셋** (`presets/ops.yaml`). 경량 운영 작업용 (로그·설정·문서 패치). performers 3명 (planner+qa+security), R1 only. feature 대비 ~15% 토큰 소모.
+- **`ops-safe` 프리셋** (`presets/ops-safe.yaml`). 운영 중요 작업용 (auth·payment·session 관련). performers 5명 (planner+developer+qa+security+devils), R1+R2+Synthesis, qa·security·devils 3명 강제 감사. feature 대비 ~60% 토큰 소모. **change_impact_report** 자동 생성 플래그 포함.
+
+#### Stage 2 — 프로파일 체계
+- **`profile` 필드** (`schemas/config.json`). Claude 요금제 기반 통합 프로파일. 값: `pro-plan` / `max-plan` / `custom`. 기본값 `pro-plan`.
+- **`profiles/pro-plan.yaml`** — Claude Pro 플랜 대상. 모든 Performer 1순위 Gemini/Ollama. final-auditor sonnet/Gemini pro 허용 (opus 완화). planner/scribe 외부 이관 허용. 출력 상한 60% 적용. 예상 Claude API 절감 85~90%.
+- **`profiles/max-plan.yaml`** — Claude Max5 플랜 대상. planner/developer/scribe/final-auditor Claude 고정. opus 유지. 출력 상한 100%. 품질 저하 없음.
+- **`/ensembra:config` picker** 에 `(0) Profile` 선택 메뉴 추가.
+
+#### Stage 3 — 정책 완화
+- **v0.8.0 final-auditor opus 불변식** 을 `pro-plan` 프로파일에서 완화. `policy_relaxations.final_auditor_opus_optional: true` 로 sonnet/Gemini pro 실행 가능. `max-plan` 에서는 opus 유지.
+- **planner/scribe 외부 이관 금지선** 을 `pro-plan` 에서 완화. `policy_relaxations.planner_external_allowed` / `scribe_external_allowed` 플래그로 토글.
+- CONTRACT.md §11.3 에 완화 조항 명시.
+
+#### Stage 3.5~3.8 — 위험 기반 자동 라우팅
+- **Stage A — 요청 Triage** (`skills/run/SKILL.md`). Gemini flash (MCP `gemini-triage`) 로 사용자 입력 분류 → preset·profile 자동 제안. intent/domain/risk_score/confidence 반환.
+- **Stage B — 코드 컨텍스트 재평가**. Phase 0 Deep Scan 산출물 재활용해 호출 그래프·데이터 흐름·테스트 맵·파일 경로·git churn 기반 점수 가산. 추가 tool call 없음.
+- **Kill Switch — 치명 신호 감지**. 세션/인증 상태 변경·schema migration·.env 삭제·public API 시그니처 변경·위험 명령어 감지 시 강제 중단 + max-plan 승인 요구. 3모드 (`strict`/`warn`/`off`).
+- **자동 업그레이드 3모드** (`risk_routing.mode`). `always_ask` (모든 +3 변동 확인), `staged` (알림·자동 임계값 분리, 기본), `aggressive` (모든 +3 변동 자동).
+- **`risk_routing` 설정** (`schemas/config.json`). 키워드·경로·임계값·로그 옵션 일체.
+- **로그 파일** `docs/reports/risk/runs.jsonl`. 위험 판정 결정 기록. 주기 리뷰로 프로젝트 고유 키워드 발견용. 원문 미보존 (sha256 prefix 8자).
+- `CONTRACT.md §19 Risk Routing` 신설. 설계 원칙·금지선·로깅 스키마 명시.
+
+#### 기타
+- qa Ollama 모델 `llama3.1:8b` → `qwen2.5:14b` 승격. security 와 모델 공유 → Ollama 메모리 14.5GB → 9GB (단일 인스턴스). 추론 품질 향상.
+
+### Changed
+
+- `skills/config/SKILL.md` 메인 메뉴에 `(0) Profile`, `(11) Risk Routing` 항목 추가. 프리셋 6 → 8 (ops/ops-safe 포함).
+- `skills/run/SKILL.md` 에 `Profile Resolution`, `Risk Routing — Stage A`, `Phase 0.5 — Risk Re-evaluation (Stage B)` 섹션 신설.
+- `CONTRACT.md §11.1` Debate/Audit 분리 원칙에 v0.9.0 완화 조항 추가.
+- `CONTRACT.md §11.2` 프리셋 매트릭스에 ops/ops-safe 행 추가.
+- `README.md`, `CONTRIBUTING.md`, `examples/quickstart.md`, `.marketplace/SUBMISSION.md` 에서 qa 모델 `llama3.1:8b` → `qwen2.5:14b` 교체, 프리셋 리스트에 ops/ops-safe 추가.
+
+### Expected Impact
+
+| 지표 | 현재 (v0.8.1) | v0.9.0 (pro-plan) | v0.9.0 (max-plan) |
+|------|-------------|-------------------|-------------------|
+| 단일 실행 컨텍스트 | 20~25% | **8~10%** | 15~18% |
+| Claude API 토큰 | 100% | **~10~15%** | ~90% |
+| 일일 75건 컨텍스트 누적 | ~1,875% (한도 초과) | **~193%** | ~1,200% |
+| 절감률 (vs v0.8.1) | — | **~90%** | ~15% |
+
+### Pending Verification (Stage 4)
+
+- 실제 파이프라인 실행 시 Stage A/B 동작 검증 (Gemini MCP 호출 흐름)
+- 프로파일 YAML 로드 + 오버라이드 적용 흐름 검증
+- Kill Switch 치명 신호 감지 정확도 측정
+- 자동 업그레이드 3모드 UX 검증
+- ~~MCP server 추가 등록 필요~~ → **v0.9.0 초기 결정 재수정**: 단일 MCP server 통합 구조 채택. 기존 `gemini-architect` 를 `gemini-ensembra` 로 리네임하고 9개 역할별 tool 제공. 참조: CONTRACT.md §18.5.
+
+### Refactored (MCP server 구조)
+
+- **역할별 모듈 분할**: 단일 `server.py` (406줄) → 다중 모듈 구조
+  - `server.py` — 메인 엔트리 + MCP dispatch (축소, ~180줄)
+  - `keychain.py` — OS 키체인 통합 (macOS/Linux/Windows)
+  - `gemini_client.py` — Gemini REST API 호출 + system prompt 주입
+  - `roles/__init__.py` — 역할 registry (동적 로드)
+  - `roles/{architect,planner,developer,security,qa,devils,scribe,final_auditor,triage}.py` — 9개 역할별 모듈. 각각 TOOL_NAME, DEFAULT_MODEL, DEFAULT_TIMEOUT, TEMPERATURE, RESPONSE_MIME_TYPE, DESCRIPTION, SYSTEM_PROMPT 제공
+- **역할별 system prompt**: `agents/*.md` 의 책임·출력 규칙·Reuse-First·금지사항을 각 역할 모듈의 `SYSTEM_PROMPT` 에 한국어로 내장. Gemini 가 역할에 맞는 응답을 내도록 유도.
+- **역할별 Temperature 차등**: security 0.3, triage 0.2 (결정적) / devils 0.8 (창의적) / architect 0.6 (균형) 등 역할 특성 반영
+- **`triage_request` 는 `responseMimeType: "application/json"` 강제**: Stage A 분류 결과가 항상 파싱 가능한 JSON
+
+### Breaking Changes
+
+- **MCP server 리네임**: `gemini-architect` → **`gemini-ensembra`**
+  - 디렉토리: `mcp-servers/gemini-architect/` → `mcp-servers/gemini-ensembra/`
+  - server.py `SERVER_NAME`: `ensembra-gemini-architect` → `ensembra-gemini`
+  - plugin.json `mcpServers` 등록 이름 변경
+  - 기존 `gemini-architect` 등록 사용자는 **`/plugin reload` 필요**. 설치된 MCP server 는 새 경로로 자동 재등록됨 (plugin.json 기준).
+  - 마이그레이션: `settings.local.json` 의 `mcpServers.gemini-architect` 엔트리가 있으면 사용자가 수동 제거 또는 Claude Code 가 자동 정리.
+  - 리네임 근거: v0.9.0 에서 server 가 Ensembra 전체 Performer (9종) 를 담당하는 만큼, "architect" 이름은 실제 범위를 왜곡. `gemini-ensembra` 로 통일해 명확성 확보.
+
+### Version bump
+
+- `0.8.1` → `0.9.0` (MINOR with breaking: MCP server name)
+- 기존 사용자 영향: (1) profile 기본값 `pro-plan` 으로 Transport 체인 변경. (2) MCP server 이름 변경으로 `/plugin reload` 1회 필요. 마이그레이션 대화 첫 실행 시 자동 표시 예정 (Stage 4).
+
 ## [0.8.1] — 2026-04-17
 
 ### Added (외부 LLM 호출 실시간 가시화 — Live Indicators 3 레이어)

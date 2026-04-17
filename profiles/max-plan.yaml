@@ -1,0 +1,102 @@
+name: max-plan
+description: |
+  Claude Max5 플랜 사용자 대상 프로파일 (v0.9.0+).
+  품질 우선. planner/developer/scribe/final-auditor 등 핵심 경로는 Claude 고정.
+  외부 LLM 은 보조 역할 (Gemini 폴백, Ollama 미사용).
+  대상: 품질이 중요한 중대 작업, 토큰 예산 여유 있는 사용자.
+
+plan_tier: max
+
+transport_routing:
+  # 모든 MCP 호출은 단일 server `gemini-ensembra` 의 역할별 tool 로 통합 (v0.9.0+).
+  # mcp_tool_name 은 역할 이름에서 자동 유추 가능하나, 명시적으로 지정해 가독성 확보.
+
+  planner:
+    # v0.8.0 원래 금지선 유지 — Claude sonnet 고정
+    chain:
+      - { transport: "claude-subagent",                                                                 model: "sonnet",            timeout_sec: 300 }
+      - { transport: "mcp", mcp_server_name: "gemini-ensembra", mcp_tool_name: "planner_deliberate",   model: "gemini-2.5-pro",   timeout_sec: 120 }
+
+  architect:
+    # 현행 유지 (Gemini flash → Ollama qwen → Claude sonnet)
+    chain:
+      - { transport: "mcp", mcp_server_name: "gemini-ensembra", mcp_tool_name: "architect_deliberate", model: "gemini-2.5-flash", timeout_sec: 60 }
+      - { transport: "ollama",                                                                          model: "qwen2.5:14b",       timeout_sec: 120 }
+      - { transport: "claude-subagent",                                                                 model: "sonnet",            timeout_sec: 300 }
+
+  developer:
+    # Claude 우선 (Phase 2 실행자와 동일 엔진 계열)
+    chain:
+      - { transport: "claude-subagent",                                                                 model: "sonnet",            timeout_sec: 300 }
+      - { transport: "mcp", mcp_server_name: "gemini-ensembra", mcp_tool_name: "developer_deliberate", model: "gemini-2.5-pro",   timeout_sec: 120 }
+
+  security:
+    chain:
+      - { transport: "ollama",                                                                          model: "qwen2.5:14b",       timeout_sec: 120 }
+      - { transport: "mcp", mcp_server_name: "gemini-ensembra", mcp_tool_name: "security_deliberate",  model: "gemini-2.5-flash", timeout_sec: 60 }
+      - { transport: "claude-subagent",                                                                 model: "sonnet",            timeout_sec: 300 }
+
+  qa:
+    chain:
+      - { transport: "ollama",                                                                          model: "qwen2.5:14b",       timeout_sec: 120 }
+      - { transport: "mcp", mcp_server_name: "gemini-ensembra", mcp_tool_name: "qa_deliberate",        model: "gemini-2.5-flash", timeout_sec: 60 }
+      - { transport: "claude-subagent",                                                                 model: "sonnet",            timeout_sec: 300 }
+
+  devils-advocate:
+    # haiku 우선 (빠른 반응성, Claude 스타일 반론)
+    chain:
+      - { transport: "claude-subagent",                                                                 model: "haiku",             timeout_sec: 120 }
+      - { transport: "mcp", mcp_server_name: "gemini-ensembra", mcp_tool_name: "devils_deliberate",    model: "gemini-2.5-flash", timeout_sec: 60 }
+
+  scribe:
+    # Claude sonnet 고정 (문서 품질 우선). v0.8.0 금지선 유지
+    chain:
+      - { transport: "claude-subagent",                                                                 model: "sonnet",            timeout_sec: 300 }
+      - { transport: "mcp", mcp_server_name: "gemini-ensembra", mcp_tool_name: "scribe_deliberate",    model: "gemini-2.5-pro",   timeout_sec: 120 }
+
+  final-auditor:
+    # v0.8.0 opus 불변식 유지 (max-plan 에서는 강제)
+    chain:
+      - { transport: "claude-subagent",                                                                 model: "opus",              timeout_sec: 600 }
+      - { transport: "claude-subagent",                                                                 model: "sonnet",            timeout_sec: 300 }
+
+  triage:
+    # v0.9.0+ Stage A 요청 Triage. max-plan 에서도 무료 Gemini flash 활용 (비용 0)
+    chain:
+      - { transport: "mcp", mcp_server_name: "gemini-ensembra", mcp_tool_name: "triage_request",       model: "gemini-2.5-flash", timeout_sec: 30 }
+
+# 출력 길이 상한 계수 — 100% (현행)
+output_limits_multiplier: 1.0
+
+# 라운드 관련 — 현행 유지
+rounds_override:
+  r2_trigger_consensus: 85        # max: 85% 이상이면 R2 스킵
+  synthesis_consensus: 70
+  halt_consensus: 40
+
+# Phase 3 감사자 제한 — preset 전원
+phase3_override:
+  max_auditors: -1                # 무제한 (preset 지정 전원)
+
+# Phase 4 scribe 입력 — 제한 없음
+phase4_override:
+  scribe_max_chars_per_phase: -1  # 무제한
+
+# Deep Scan tier — max
+deep_scan_override:
+  tier: "max"
+  optional_items_default_off: false
+
+# 정책 완화 플래그 — max-plan 은 원래 정책 유지
+policy_relaxations:
+  final_auditor_opus_optional: false   # opus 필수
+  planner_external_allowed: false      # planner Claude 고정
+  scribe_external_allowed: false       # scribe Claude 고정
+  developer_external_default: false    # developer Claude 기본
+
+# 예상 비용·효과 (정보 목적)
+expected_impact:
+  claude_api_reduction: "0~10% (출력 상한만 적용)"
+  context_window_reduction: "15~25%"
+  quality_tradeoff: "없음 (v0.8.x 기준 동등 품질)"
+  rate_limit_risk: "Max5 5시간 토큰 한도 내 약 5~8회 feature 실행 가능"

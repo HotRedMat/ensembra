@@ -1,0 +1,109 @@
+name: pro-plan
+description: |
+  Claude Pro 플랜 사용자 대상 프로파일 (v0.9.0+).
+  비용 최소화 우선. 모든 Performer 1순위를 Gemini/Ollama 로 배치. Claude 는 최후 폴백.
+  v0.8.0 final-auditor opus 불변식을 pro-plan 에서는 완화 (sonnet/Gemini pro 허용).
+  대상: Claude Pro 플랜의 5시간 토큰 한도 내 다수 작업 수행.
+
+plan_tier: pro
+
+# 각 Performer 의 Transport Fallback Chain. 순서대로 시도, 실패 시 다음으로 폴백.
+transport_routing:
+  # 모든 역할은 단일 MCP server `gemini-ensembra` 에 통합된 역할별 tool 을 호출한다.
+  # server 이름은 역사적 유산 (v0.7.0 최초 도입). 실제로는 Ensembra 전체 Gemini 경로 담당.
+  # mcp_tool_name 은 역할 이름에서 자동 유추 (architect → architect_deliberate 등).
+
+  planner:
+    # pro-plan 에서 planner 외부 이관 금지선 완화 (CONTRACT.md §11.3 완화)
+    chain:
+      - { transport: "mcp", mcp_server_name: "gemini-ensembra", mcp_tool_name: "planner_deliberate",   model: "gemini-2.5-flash", timeout_sec: 60 }
+      - { transport: "ollama",                                                                          model: "qwen2.5:14b",       timeout_sec: 120 }
+      - { transport: "claude-subagent",                                                                 model: "sonnet",            timeout_sec: 300 }
+
+  architect:
+    # 현행 유지 (Gemini flash → Ollama qwen → Claude sonnet)
+    chain:
+      - { transport: "mcp", mcp_server_name: "gemini-ensembra", mcp_tool_name: "architect_deliberate", model: "gemini-2.5-flash", timeout_sec: 60 }
+      - { transport: "ollama",                                                                          model: "qwen2.5:14b",       timeout_sec: 120 }
+      - { transport: "claude-subagent",                                                                 model: "sonnet",            timeout_sec: 300 }
+
+  developer:
+    # pro-plan 에서 기본값을 외부 체인으로 변경 (Gemini pro 우선)
+    chain:
+      - { transport: "mcp", mcp_server_name: "gemini-ensembra", mcp_tool_name: "developer_deliberate", model: "gemini-2.5-pro",   timeout_sec: 120 }
+      - { transport: "ollama",                                                                          model: "gpt-oss:20b",       timeout_sec: 180 }
+      - { transport: "claude-subagent",                                                                 model: "sonnet",            timeout_sec: 300 }
+
+  security:
+    chain:
+      - { transport: "mcp", mcp_server_name: "gemini-ensembra", mcp_tool_name: "security_deliberate",  model: "gemini-2.5-flash", timeout_sec: 60 }
+      - { transport: "ollama",                                                                          model: "qwen2.5:14b",       timeout_sec: 120 }
+      - { transport: "claude-subagent",                                                                 model: "sonnet",            timeout_sec: 300 }
+
+  qa:
+    chain:
+      - { transport: "mcp", mcp_server_name: "gemini-ensembra", mcp_tool_name: "qa_deliberate",        model: "gemini-2.5-flash", timeout_sec: 60 }
+      - { transport: "ollama",                                                                          model: "qwen2.5:14b",       timeout_sec: 120 }
+      - { transport: "claude-subagent",                                                                 model: "sonnet",            timeout_sec: 300 }
+
+  devils-advocate:
+    # Gemini flash 우선 (무료 + 빠름), haiku 는 폴백
+    chain:
+      - { transport: "mcp", mcp_server_name: "gemini-ensembra", mcp_tool_name: "devils_deliberate",    model: "gemini-2.5-flash", timeout_sec: 60 }
+      - { transport: "claude-subagent",                                                                 model: "haiku",             timeout_sec: 120 }
+
+  scribe:
+    # pro-plan 에서 scribe 외부 이관 금지선 완화. Gemini pro 우선
+    chain:
+      - { transport: "mcp", mcp_server_name: "gemini-ensembra", mcp_tool_name: "scribe_deliberate",    model: "gemini-2.5-pro",   timeout_sec: 120 }
+      - { transport: "claude-subagent",                                                                 model: "sonnet",            timeout_sec: 300 }
+
+  final-auditor:
+    # pro-plan 에서 opus 불변식 완화 (CONTRACT.md §11.3 완화)
+    # Gemini pro 1순위, sonnet 폴백. opus 미사용 → Claude API 비용 대폭 절감
+    chain:
+      - { transport: "mcp", mcp_server_name: "gemini-ensembra", mcp_tool_name: "final_auditor_deliberate", model: "gemini-2.5-pro", timeout_sec: 180 }
+      - { transport: "claude-subagent",                                                                     model: "sonnet",         timeout_sec: 300 }
+
+  triage:
+    # v0.9.0+ Stage A 요청 Triage 전용. 역할이 아닌 유틸리티 호출.
+    # 실패 시 Claude Code 본체 간이 키워드 매칭으로 폴백 (SKILL.md Risk Routing 섹션).
+    chain:
+      - { transport: "mcp", mcp_server_name: "gemini-ensembra", mcp_tool_name: "triage_request",       model: "gemini-2.5-flash", timeout_sec: 30 }
+
+# 출력 길이 상한에 곱해지는 계수 (에이전트 파일의 기본값 * multiplier)
+# pro-plan 은 60% 적용 (더 엄격)
+output_limits_multiplier: 0.6
+
+# 라운드 관련 오버라이드
+rounds_override:
+  r2_trigger_consensus: 70        # pro-plan: 합의율 70% 이상이면 R2 자동 스킵 (max 는 85%)
+  synthesis_consensus: 70         # 현행 동일
+  halt_consensus: 40              # 현행 동일
+
+# Phase 3 감사자 제한
+phase3_override:
+  max_auditors: 2                 # 전문 감사자 첫 1명 + final-auditor = 총 2명
+
+# Phase 4 scribe 입력 제한
+phase4_override:
+  scribe_max_chars_per_phase: 300 # Phase 0~3 기록을 각 300자로 요약 후 scribe 에게 전달
+
+# Deep Scan tier 강제
+deep_scan_override:
+  tier: "pro"                     # compressed mode
+  optional_items_default_off: true
+
+# 정책 완화 플래그 (v0.9.0+)
+policy_relaxations:
+  final_auditor_opus_optional: true    # opus 대신 sonnet 또는 Gemini pro 허용
+  planner_external_allowed: true       # planner 외부 LLM 이관 허용
+  scribe_external_allowed: true        # scribe 외부 LLM 이관 허용
+  developer_external_default: true     # developer 기본값을 외부 체인으로
+
+# 예상 비용·효과 (정보 목적)
+expected_impact:
+  claude_api_reduction: "85~90%"
+  context_window_reduction: "50~60%"
+  quality_tradeoff: "설계·요구사항 해석 10~15% 저하 (Gemini 기반), 테스트·보안 동등"
+  rate_limit_risk: "Gemini pro Daily 50회 도달 시 Claude sonnet 폴백"

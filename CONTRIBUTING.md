@@ -29,7 +29,7 @@ claude --plugin-dir /path/to/ensembra
 
 ### Optional transport setup
 
-- **Ollama**: `ollama pull qwen2.5:14b llama3.1:8b`
+- **Ollama**: `ollama pull qwen2.5:14b` (v0.9.0+: security 와 qa 공유. 이전 버전 `llama3.1:8b` 불필요)
 - **Gemini**: get a free key at `https://aistudio.google.com/app/apikey`. Set it via Claude Code's native plugin UI: `/plugin → ↓ to ensembra → Enter → Configure options → enter key (hidden) → Save → /reload-plugins`. The key is stored in the OS keychain (macOS Keychain or `~/.claude/.credentials.json`), never in a plaintext file. v0.5.0 removed all workaround paths (env file, bin script, chat paste).
 
 ## Making changes

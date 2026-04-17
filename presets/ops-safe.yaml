@@ -1,0 +1,32 @@
+name: ops-safe
+description: 운영 중요 작업 (v0.9.0+). 프로덕션 영향 있는 수정 (auth·payment·session·schema 관련). 정밀 감사 필수. planner+developer+qa+security+devils 5명, R1+R2+synthesis, qa·security·devils 감사. feature 프리셋의 ~60% 토큰 소모.
+
+performers:
+  - planner
+  - developer
+  - qa
+  - security
+  - devils-advocate
+
+rounds: [R1, R2, synthesis]
+
+deep_scan:
+  forced: [1, 2, 3, 4, 9]   # 구조·키워드·호출그래프·데이터흐름·공통모듈 (영향 반경 파악 필수)
+  optional: [5, 7]           # 테스트 맵 + 의존성
+
+phase2:
+  execute: true
+
+phase3:
+  audit: true
+  # v0.9.0+: 운영 중요 작업은 qa(회귀)·security(권한)·devils(블래스트 반경) 3명 필수 감사
+  auditors: [qa, security, devils-advocate, final-auditor]
+  final_auditor: final-auditor
+
+phase4:
+  document: true
+  generate:
+    task_report: true            # 강제
+    design_doc: false            # 운영 수정은 설계 문서 생성 안 함
+    request_spec: false          # 운영 수정은 요청서 생성 안 함
+    change_impact_report: true   # v0.9.0+ 신규: 영향 분석 보고서 (다른 시스템·사이트 영향 명시)

@@ -1,6 +1,6 @@
 ---
 name: architect
-description: Ensembra 의 아키텍처 설계 담당. 모듈 경계·구조 패턴·설계 결정을 다룬다. Phase 1/3 참여. 기본 Transport 는 MCP(gemini-architect) 이며, 폴백 순서는 Ollama(qwen2.5:14b) → Claude(sonnet). 신규 기능·리팩토링·구조 변경 토론 시 호출한다.
+description: Ensembra 의 아키텍처 설계 담당. 모듈 경계·구조 패턴·설계 결정을 다룬다. Phase 1/3 참여. 기본 Transport 는 MCP(gemini-ensembra) 이며, 폴백 순서는 Ollama(qwen2.5:14b) → Claude(sonnet). 신규 기능·리팩토링·구조 변경 토론 시 호출한다.
 model: sonnet
 tools: Read, Grep, Glob
 ---
@@ -13,7 +13,7 @@ tools: Read, Grep, Glob
 
 architect 는 3단 폴백 체인으로 호출된다. Conductor 는 상위 Transport 가 실패하면 자동으로 다음 단계로 전환한다.
 
-### 우선순위 1: MCP server (`gemini-architect`)
+### 우선순위 1: MCP server (`gemini-ensembra`)
 
 - **방식**: Claude Code MCP tool-use (`architect_deliberate`)
 - **모델**: `gemini-2.5-flash` (기본값, tool 인자로 변경 가능)
@@ -50,6 +50,16 @@ architect 는 3단 폴백 체인으로 호출된다. Conductor 는 상위 Transp
 
 ## 출력 계약
 `schemas/agent-output.json` 준수, R1 에선 `reuse_analysis` 필수. 상세는 [`../CONTRACT.md`](../CONTRACT.md) §3.
+
+## 출력 길이 상한 (v0.9.0+)
+
+토큰 절약을 위해 출력 본문은 다음 상한 이내로 유지한다:
+
+- **R1 설계 분석**: 600자 이내 (대안 2~3개를 각 150자 이내로 기술)
+- **R2 반론·수정**: 400자 이내
+- **Phase 3 감사 의견**: 500자 이내
+
+초과 필요 시 핵심 bullet 3개로 압축. 장황한 설명·중복 논증 금지. 상한 위반은 Conductor 가 경고 배지를 띄우고 다음 실행에 자동 재압축을 시도한다. `pro-plan` 프로파일에서는 상한이 60% 수준으로 더 강화된다 (R1 360자 / R2 240자 / 감사 300자).
 
 ## Reuse-First 원칙
 - Context Snapshot 의 공통 모듈 인벤토리(`commons/`, `shared/`, `lib/`, `framework/`) 를 우선 확인

@@ -34,3 +34,8 @@ coverage/
 # Dependencies (Gate2 대비)
 node_modules/
 .pnpm-store/
+
+# Python (v0.9.0+ mcp-servers/gemini-ensembra/)
+__pycache__/
+*.pyc
+*.pyo
