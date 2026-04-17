@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/HotRedMat/ensembra/releases"><img src="https://img.shields.io/badge/version-0.7.0-blue" alt="version"/></a>
+  <a href="https://github.com/HotRedMat/ensembra/releases"><img src="https://img.shields.io/badge/version-0.7.2-blue" alt="version"/></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="license"/></a>
   <img src="https://img.shields.io/badge/plugin%20validate-passing-brightgreen" alt="plugin validate"/>
   <img src="https://img.shields.io/badge/verification-end--to--end-brightgreen" alt="verification"/>
@@ -115,10 +115,22 @@ ollama pull qwen2.5:14b llama3.1:8b
 
 The architect Performer uses Gemini via MCP server as the primary transport. The MCP server is **automatically registered** when the plugin is installed (`plugin.json` declares `mcpServers`). To enable:
 
-1. Set API key: `/plugin → ensembra → Configure options`
+1. Set API key: `/plugin → ensembra → Configure options → gemini_api_key`
 2. `/reload-plugins`
 
 That's it — no manual `settings.local.json` editing needed. If Gemini is unavailable (no key set, API error), architect falls back to Ollama (`qwen2.5:14b`), then to a Claude sub-agent — Ensembra works fully without Gemini or Ollama. The API key is stored securely in the OS keychain (`sensitive: true`) and passed only to the MCP server process env — never exposed in skill/agent content or session logs. See [`SECURITY.md`](./SECURITY.md) and `CHANGELOG.md [0.7.0]` for details.
+
+### Prerequisites per platform
+
+The MCP server (`mcp-servers/gemini-architect/server.py`) runs under `python3` and uses only the Python standard library — no `pip install` required. Platform notes:
+
+| OS | Status | Keychain backend | Notes |
+|---|---|---|---|
+| macOS | Primary | `security find-generic-password` | No extra setup. Keychain service name `Claude Code-credentials` |
+| Linux | Secondary | `secret-tool` (libsecret / GNOME Keyring) | Install with `sudo apt install libsecret-tools` or equivalent. Alternative: set env `GEMINI_API_KEY=...` |
+| Windows | Secondary | Win32 Credential Manager (`CredReadW`) | `python3` must resolve on PATH. If only `python` is available, add a `python3` alias via the `py` launcher or a PATH shim. Alternative: set `$env:GEMINI_API_KEY` in your PowerShell profile |
+
+If `python3` is not on PATH, the MCP server silently fails and the architect Performer falls back to Ollama → Claude — you will see the fallback in the transport badge but not the underlying Python error. Run `python3 --version` once to confirm.
 
 ## Reuse-First Policy
 

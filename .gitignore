@@ -9,6 +9,8 @@ Thumbs.db
 
 # Claude Code local state (not part of plugin)
 .claude/settings.local.json
+# Project-level MCP registration — contains absolute paths, local-only
+.mcp.json
 
 # Logs
 *.log

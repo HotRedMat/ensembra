@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2] — 2026-04-17
+
+### Fixed (marketplace portability)
+
+- **신규 사용자 키 설정 경로 복구**. 직전 WIP 에서 `plugin.json` 의 `userConfig` 블록을 제거했으나, 이 경우 `/plugin → ensembra → Configure options` UI 자체가 사라져 마켓에서 신규 설치한 사용자가 API 키를 등록할 공식 경로가 없어지는 문제가 확인되었다 (`docs/reports/tasks/2026-04-17-marketplace-portability-audit.md`). v0.7.0 형태의 `userConfig.gemini_api_key` (sensitive:true) + `ollama_endpoint` (sensitive:false) 를 복원하고, `mcpServers.gemini-architect.env` 블록(`GEMINI_API_KEY: "${user_config.gemini_api_key}"`) 도 함께 되살렸다.
+- **Windows 지원 추가**. `mcp-servers/gemini-architect/server.py` 에 `_read_keychain_windows()` 를 추가하여 Windows Credential Manager 의 `Claude Code-credentials` 항목을 Win32 `CredReadW` (ctypes, stdlib 유지) 로 직접 조회한다. API 키 해석 폴백 체인은 이제 macOS / Linux / Windows 3 플랫폼 모두에서 동작한다.
+- **시작 로그에 Python 버전·플랫폼 노출**. `server.py` start 메시지가 `python=3.x.y, platform=Darwin/Linux/Windows` 를 출력하여, MCP 서버가 조용히 실패할 때 원인 진단이 쉬워진다.
+- **Ollama 빈 endpoint 처리 명문화**. `skills/run/SKILL.md` 2단 폴백 설명에 `userConfig.ollama_endpoint` 가 빈 문자열일 때 Ollama 를 건너뛰고 3단(Claude) 으로 직행한다는 규칙을 추가했다.
+
+### Changed
+
+- `mcp-servers/gemini-architect/server.py`: `SERVER_VERSION` 0.7.1 → 0.7.2
+- `.claude-plugin/plugin.json` / `.claude-plugin/marketplace.json`: version 0.7.1 → 0.7.2
+- `.gitignore`: 프로젝트 루트의 `.mcp.json` (로컬 MCP 등록용, 절대 경로 포함) 제외
+
+### Platform support
+
+- **macOS**: 1차 지원 (Keychain via `security find-generic-password`)
+- **Linux**: 2차 지원 (Secret Service via `secret-tool`). secret-tool 이 설치되어 있지 않으면 env `GEMINI_API_KEY` 설정 필요
+- **Windows**: 2차 지원 (Credential Manager via Win32 `CredReadW`). `python3` 명령이 PATH 에 없으면 `py launcher` 로 `python` alias 를 마련하거나 env `GEMINI_API_KEY` 를 PowerShell 프로파일에 설정 (`$env:GEMINI_API_KEY = "..."`)
+
 ## [0.7.0] — 2026-04-16
 
 ### Added

@@ -1,6 +1,6 @@
 {
   "name": "ensembra",
-  "version": "0.7.0",
+  "version": "0.7.2",
   "description": "Multi-agent orchestrator plugin for Claude Code — agents perform in concert through a 5-phase pipeline (Gather → Deliberate → Execute → Audit → Document) with Reuse-First cross-cutting policy.",
   "author": {
     "name": "Seungho Lee",
@@ -30,14 +30,14 @@
   "userConfig": {
     "gemini_api_key": {
       "type": "string",
-      "title": "Gemini API key (used by MCP server for architect transport in v0.7.0+)",
-      "description": "Google AI Studio API key. In v0.7.0+ this key is passed to the ensembra-gemini-architect MCP server via env var — skill/agent content never sees it (sensitive:true invariant). Set via /plugin → ensembra → Configure options. Used when architect transport is configured as 'mcp'.",
+      "title": "Gemini API key (architect Transport)",
+      "description": "Google AI Studio API key. Stored in OS keychain (macOS Keychain / Linux Secret Service / Windows Credential Manager) via Claude Code's sensitive config channel. Passed to the MCP server process env — never exposed in skill/agent content. Set via /plugin → ensembra → Configure options. If not set, architect Performer falls back to Ollama → Claude sub-agent.",
       "sensitive": true
     },
     "ollama_endpoint": {
       "type": "string",
       "title": "Ollama endpoint",
-      "description": "Ollama HTTP endpoint for the security and qa performers. Default: http://localhost:11434. Leave blank to skip Ollama — those performers will fall back to Claude sub-agents.",
+      "description": "Ollama HTTP endpoint for the security and qa Performers. Default: http://localhost:11434. Leave blank to skip Ollama — those Performers will fall back to Claude sub-agents.",
       "sensitive": false
     }
   }
