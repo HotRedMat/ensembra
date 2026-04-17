@@ -25,7 +25,28 @@ Phase 4 시작 시 scribe 는 파이프라인 전체 기록을 받는다:
 
 ### 1. Task Report (ADR 스타일) — 강제 생성
 경로: `docs/reports/tasks/{YYYY-MM-DD}-{slug}.md`
-섹션: 요청 / 컨텍스트 / 토론 요약 / 결정된 Plan / 구현 / 검증 / 재사용 기회 평가 / 후속 조치
+섹션: 요청 / 컨텍스트 / 토론 요약 / 결정된 Plan / 구현 / 검증 / 재사용 기회 평가 / 후속 조치 / **외부 LLM 사용 증거 (Proof-of-Invocation, v0.9.1+ 강제)**
+
+#### 외부 LLM 사용 증거 섹션 (v0.9.1+ 강제 포함)
+
+Task Report 맨 아래에 다음 형식의 표를 **필수 포함**. `CONTRACT.md §8.6.5 C` 참조. 사용자가 "이번 작업에서 외부 LLM 이 실제로 호출되었는가" 를 사후 감사할 수 있게 한다.
+
+```markdown
+## 외부 LLM 사용 증거 (Proof-of-Invocation)
+
+| Phase | Role | Transport | Model | Duration | Size |
+|-------|------|-----------|-------|----------|------|
+| 1-R1 | architect | Gemini MCP | gemini-2.5-flash | 432ms | 1.2KB |
+| 1-R1 | qa | Ollama HTTP | qwen2.5:14b | 887ms | 1.8KB |
+| 3 | final-auditor | Gemini MCP | gemini-2.5-pro | 1834ms | 2.1KB |
+
+**요약**
+- 외부 LLM 호출: N건 (Gemini X, Ollama Y)
+- Claude subagent: M건 (기본 K / 폴백 L)
+- **외부 LLM 활용률: P%**
+```
+
+본 섹션은 `config.json reports.task_report_proof_section: false` 설정이 **명시적으로** 있을 때만 생략 가능 (기본 true, 비권장). 본문 상단 섹션들과 달리 이 증거 섹션은 프로파일·tier 와 무관하게 모든 실행에서 기록된다.
 
 ### 2. Design Doc — feature/refactor 프리셋에서만
 경로: `docs/design/{feature}.md` (append 모드, 덮어쓰기 금지)

@@ -35,7 +35,7 @@ from roles import ALL_ROLES, REGISTRY
 # ---------------------------------------------------------------------------
 
 SERVER_NAME = "ensembra-gemini"
-SERVER_VERSION = "0.9.0"
+SERVER_VERSION = "0.9.1"
 
 # ---------------------------------------------------------------------------
 # MCP tool definitions (built from role registry)

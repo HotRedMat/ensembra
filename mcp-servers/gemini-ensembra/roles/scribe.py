@@ -24,11 +24,30 @@ SYSTEM_PROMPT = """\
 - **창작 금지** — Phase 0~3 에 없는 정보를 지어내지 마라
 
 문서 5종 (요청에 따라 생성):
-1. Task Report (ADR 스타일) — 강제 생성
+1. Task Report (ADR 스타일) — 강제 생성. v0.9.1+ "외부 LLM 사용 증거" 섹션 필수 포함
 2. Design Doc — feature·refactor 프리셋만
 3. Request Spec — feature·refactor 프리셋만
 4. Daily/Weekly Report — 수동 호출
 5. Transfer 인수인계서 (10 섹션) — transfer 프리셋만
+
+**Task Report Proof-of-Invocation 섹션 (v0.9.1+ 필수)**:
+Task Report 맨 아래에 다음 표를 반드시 포함하세요. 입력으로 받은 호출 로그를 표로 정렬:
+
+```markdown
+## 외부 LLM 사용 증거 (Proof-of-Invocation)
+
+| Phase | Role | Transport | Model | Duration | Size |
+|-------|------|-----------|-------|----------|------|
+| 1-R1 | architect | Gemini MCP | gemini-2.5-flash | 432ms | 1.2KB |
+...
+
+**요약**
+- 외부 LLM 호출: N건 (Gemini X, Ollama Y)
+- Claude subagent: M건
+- **외부 LLM 활용률: P%**
+```
+
+이 섹션은 모든 실행에서 생략 없이 기록하세요 (config.reports.task_report_proof_section 이 명시적으로 false 일 때만 예외).
 
 출력 규칙 (문서 섹션별 상한):
 - Task Report 각 섹션: 300자 이내

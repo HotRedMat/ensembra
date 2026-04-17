@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] — 2026-04-17 (외부 LLM 사용 증명 4종 강화)
+
+### Added — Proof-of-Invocation 4종 메커니즘
+
+사용자가 "외부 LLM 이 정말로 호출되었는가" 를 여러 시점에서 반복 확인할 수 있도록 4종 증거 메커니즘 강제. v0.8.1 Live Indicators 3 레이어 위에 얹어진 추가 보증 레이어.
+
+- **A. 응답 증명 배너 (Response Proof Banner)**: 각 Performer 응답 본문 최상단에 `┌─ 🌐 EXTERNAL LLM VERIFIED ─┐` 메타데이터 블록 강제 prepend. Transport / model / duration / resp_size / endpoint 표시. Claude 폴백 시에는 `⚪ CLAUDE SUBAGENT (FALLBACK)` + `fallback_reason` 으로 명시적 구분.
+- **B. Phase 종료 역할별 상세표**: `📊 Phase 1 외부 LLM 사용 증거:` 표 형식으로 각 Performer 호출의 실제 Transport 노출. ✓/✗ 마커로 외부·내부 구분.
+- **C. Task Report Proof-of-Invocation 섹션**: scribe 가 생성하는 Task Report 맨 아래에 "외부 LLM 사용 증거" 표 강제 포함. 사후 감사 가능한 영구 기록.
+- **D. 파이프라인 종료 배너**: 파이프라인 완료 시 박스형 증명 배너. Phase별 호출 분포 + 외부 LLM 활용률 + Claude API 예상 소비 + 프로파일 라벨.
+
+### Changed
+
+- `CONTRACT.md` §8.6.5 신설. 4종 증거 메커니즘 규약·보안 불변식·토글 명시.
+- `skills/run/SKILL.md` 에 "레이어 4: Proof-of-Invocation 강화" 섹션 추가.
+- `agents/scribe.md` Task Report 템플릿에 "외부 LLM 사용 증거" 섹션 강제 포함 규약 명시.
+- `roles/scribe.py` system prompt 에 증거 섹션 필수 규약 내장.
+- `schemas/config.json` 에 2개 토글 필드 추가:
+  - `logging.proof_of_invocation` (기본 true) — A/B/D 3종 활성화
+  - `reports.task_report_proof_section` (기본 true) — C 활성화
+
+### Version bump
+
+- `0.9.0` → `0.9.1` (PATCH, 기능 추가만)
+- 기존 사용자 영향: 없음. 기본값 활성화로 재설치 시 자동 적용.
+- 배지 출력이 길어지는 것이 싫으면 `/ensembra:config → Logging → proof_of_invocation: false` 로 비활성 가능 (비권장 — 증명 기능이 핵심)
+
 ## [0.9.0] — 2026-04-17 (토큰 절약 + 프로파일 체계 + 위험 기반 라우팅)
 
 ### Added

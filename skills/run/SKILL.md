@@ -435,6 +435,47 @@ Phase 1·3 각 종료 시 외부 LLM 사용 통계 1회 출력:
 - 프롬프트·응답 본문 원문 금지 — 메타데이터(bytes/ms/상태) 만 허용
 - `logging.show_transport_badge: false` → 3 레이어 **모두** 억제 (단일 토글)
 
+#### 레이어 4: Proof-of-Invocation 강화 (v0.9.1+)
+
+`config.json logging.proof_of_invocation: true` (기본) 일 때, 3 레이어 위에 4종 증명 메커니즘이 추가된다. 사용자가 "외부 LLM 이 실제 호출되었는가" 를 **반복 확인**할 수 있도록 한다. 전체 규약: `CONTRACT.md §8.6.5`.
+
+**A. 응답 증명 배너** — 각 Performer 응답 본문 최상단에 Transport/model/duration/size 메타 블록 강제 prepend. Conductor 는 Performer 결과 수신 직후, 사용자에게 렌더링하기 전에 배너를 삽입한다.
+
+외부 LLM 성공:
+```
+┌─ 🌐 EXTERNAL LLM VERIFIED ─────────────────┐
+│  transport:  MCP(gemini-ensembra)          │
+│  model:      gemini-2.5-flash              │
+│  duration:   432ms                         │
+│  resp_size:  1.2KB                         │
+└────────────────────────────────────────────┘
+```
+
+Claude 폴백:
+```
+┌─ ⚪ CLAUDE SUBAGENT (FALLBACK) ────────────┐
+│  model:      sonnet                        │
+│  fallback_reason: MCP HTTP 429             │
+└────────────────────────────────────────────┘
+```
+
+**B. Phase 종료 역할별 상세표** — §8.6.3 집계 위에 각 Performer 호출의 실제 Transport 를 행 단위로 노출:
+```
+📊 Phase 1 외부 LLM 사용 증거:
+  ✓ architect  Gemini  gemini-2.5-flash  432ms  1.2KB  ← 실제 호출
+  ✓ qa         Ollama  qwen2.5:14b       887ms  1.8KB  ← 실제 호출
+  ✗ security   Claude  sonnet (fallback)              ← 내부 (Gemini 429)
+  외부 LLM 활용률: 2/3 (67%)
+```
+
+**C. Task Report Proof-of-Invocation 섹션** — Phase 4 scribe 가 생성하는 Task Report 맨 아래에 "외부 LLM 사용 증거" 표를 강제 포함. scribe 의 system prompt 에 내장되어 템플릿 누락 방지.
+
+**D. 파이프라인 종료 배너** — 파이프라인 완료 시 박스형 배너로 외부 LLM 총 사용량 + 활용률 + Claude API 예상 소비 출력. `profile=pro-plan`/`max-plan` 라벨 포함.
+
+**토글**:
+- `logging.proof_of_invocation: false` → A/B/D 3종 억제. C (Task Report 섹션) 는 `reports.task_report_proof_section` 로 별도 토글.
+- Live Indicators (§8.6.1~§8.6.3) 는 `show_transport_badge` 로 별도 토글.
+
 ### Phase 2 — Execute
 
 Conductor(= 현재 Claude Code 세션) 가 **본인** 도구(`Edit`, `Write`, `Bash`) 로 Plan 을 실행. 외부 Performer 는 이 단계에 관여하지 않는다.

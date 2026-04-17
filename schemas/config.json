@@ -178,13 +178,15 @@
           "default": []
         },
         "show_fallback_badge": { "type": "boolean", "default": true },
-        "show_transport_badge": { "type": "boolean", "default": true, "description": "Phase 1 시작 시 각 Performer 의 Transport/Model 배지를 출력한다." }
+        "show_transport_badge": { "type": "boolean", "default": true, "description": "Phase 1 시작 시 각 Performer 의 Transport/Model 배지를 출력한다." },
+        "proof_of_invocation": { "type": "boolean", "default": true, "description": "v0.9.1+. 외부 LLM 사용 증명 4종(응답 배너, Phase 종료 표, Task Report 섹션, 파이프라인 종료 배너) 활성화. CONTRACT.md §8.6.5 참조. false 시 4종 모두 억제 (Task Report 섹션은 reports.task_report_proof_section 으로 별도 토글)." }
       }
     },
     "reports": {
       "type": "object",
       "properties": {
         "task_report":  { "type": "boolean", "const": true },
+        "task_report_proof_section": { "type": "boolean", "default": true, "description": "v0.9.1+. Task Report 맨 아래에 '외부 LLM 사용 증거' (Proof-of-Invocation) 섹션 강제 포함. 사후 감사용 영구 기록. 비권장이지만 false 로 끌 수 있음. CONTRACT.md §8.6.5 참조." },
         "design_doc":   { "type": "boolean", "default": true },
         "request_spec": { "type": "boolean", "default": true },
         "daily":        { "type": "boolean", "default": true },
