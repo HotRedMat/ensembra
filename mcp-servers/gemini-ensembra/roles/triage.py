@@ -2,7 +2,7 @@
 
 ROLE_NAME = "triage"
 TOOL_NAME = "triage_request"
-DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL = "gemini-2.5-flash-lite"  # 경량 모델 — JSON mode 5xx 빈도 낮음, triage 분류 정확도 충분
 DEFAULT_TIMEOUT = 30
 TEMPERATURE = 0.2
 RESPONSE_MIME_TYPE = "application/json"  # 구조화 JSON 출력 강제

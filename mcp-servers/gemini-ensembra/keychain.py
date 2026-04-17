@@ -125,8 +125,11 @@ def resolve_api_key() -> str:
     if _cached_api_key:
         return _cached_api_key
 
+    checked = []
+
     # 1. Environment variable
     key = os.environ.get("GEMINI_API_KEY", "").strip()
+    checked.append("env GEMINI_API_KEY (empty)" if not key else "env GEMINI_API_KEY")
     if key:
         _cached_api_key = key
         sys.stderr.write("API key source: environment variable\n")
@@ -137,10 +140,18 @@ def resolve_api_key() -> str:
     system = platform.system()
     if system == "Darwin":
         key = _read_keychain_macos()
+        checked.append(
+            f"macOS Keychain service '{KEYCHAIN_SERVICE}' "
+            f"\u2192 pluginSecrets.ensembra@ensembra.gemini_api_key"
+        )
     elif system == "Linux":
         key = _read_keychain_linux()
+        checked.append(f"secret-tool service '{KEYCHAIN_SERVICE}'")
     elif system == "Windows":
         key = _read_keychain_windows()
+        checked.append(f"Credential Manager target '{KEYCHAIN_SERVICE}'")
+    else:
+        checked.append(f"unknown platform '{system}' — keychain skipped")
 
     if key:
         _cached_api_key = key
@@ -148,10 +159,13 @@ def resolve_api_key() -> str:
         sys.stderr.flush()
         return key
 
-    # 3. Not found
+    # 3. Not found — emit diagnostic listing every probed source so users can
+    # pinpoint which step failed (env var typo vs. keychain service mismatch).
     raise RuntimeError(
-        "GEMINI_API_KEY not found. "
-        "Set it via: /plugin \u2192 ensembra \u2192 Configure options \u2192 gemini_api_key, "
-        "then run /reload-plugins. "
-        "Alternatively, set the GEMINI_API_KEY environment variable."
+        f"GEMINI_API_KEY not found on {system}. "
+        f"Checked: {'; '.join(checked)}. "
+        f"Fix: /plugin \u2192 ensembra \u2192 Configure options \u2192 gemini_api_key, "
+        f"then run /reload-plugins. "
+        f"Alternatively, set the GEMINI_API_KEY environment variable "
+        f"(e.g., export GEMINI_API_KEY=AIza...)."
     )
