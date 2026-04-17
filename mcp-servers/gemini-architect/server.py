@@ -27,7 +27,7 @@ import urllib.request
 # ---------------------------------------------------------------------------
 
 SERVER_NAME = "ensembra-gemini-architect"
-SERVER_VERSION = "0.8.0"
+SERVER_VERSION = "0.8.1"
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 DEFAULT_ARCHITECT_MODEL = "gemini-2.5-flash"
 DEFAULT_DEVELOPER_MODEL = "gemini-2.5-pro"

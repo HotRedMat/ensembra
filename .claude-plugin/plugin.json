@@ -1,6 +1,6 @@
 {
   "name": "ensembra",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Multi-agent orchestrator plugin for Claude Code — agents perform in concert through a 5-phase pipeline (Gather → Deliberate → Execute → Audit → Document) with Reuse-First cross-cutting policy.",
   "author": {
     "name": "Seungho Lee",

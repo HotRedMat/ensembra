@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-04-17
+
+### Added (외부 LLM 호출 실시간 가시화 — Live Indicators 3 레이어)
+
+- **개별 호출 실시간 배지 (`CONTRACT.md §8.6.2`)**. Conductor 가 각 Performer 호출의 **시작(`▶`)·완료(`◀`)·폴백(`⚠`)·최종실패(`✗`)** 를 개별 라인으로 실시간 출력한다. 사용자는 외부 LLM (MCP Gemini · Ollama) 이 어느 시점에 실제로 돌고 있는지, 어느 단계에서 폴백되었는지를 직관적으로 확인 가능. v0.8.0 까지는 Phase 시작 1회 배지만 존재해 중간 호출 진행이 불가시였던 문제를 해소.
+  - 포맷 예: `▶ [Gemini  ] architect — 호출 시작 (gemini-2.5-flash @ MCP(gemini-architect))`
+  - 포맷 예: `◀ [Ollama  ] architect — 응답 수신 (4721ms, 2.3KB)`
+  - 포맷 예: `⚠ [Gemini  ] architect — HTTP 429 rate limit → Ollama 폴백`
+- **Phase 종료 집계 배지 (`§8.6.3`)**. Phase 1·3 각 종료 시 **외부 LLM 활용률** 을 1회 출력한다. 활용률 산식: `(MCP 성공 + Ollama 성공) / (Performer 호출 총 수) × 100`. 사용자는 토큰 절감 목표가 실제 달성됐는지 실측 가능.
+  - 포맷 예: `📊 Phase 1 외부 LLM 호출 집계: MCP(Gemini) 2회 / 2 성공 / 0 폴백 ... 외부 LLM 활용률: 3/4 (75%)`
+  - 해석 가이드: ≥70% 정상 / 40~70% Transport 일부 불안정 / <40% 구조적 진단 필요 (Conductor 가 사용자에게 경고 1회 추가)
+- **최종 출력 포맷 `외부 LLM 활용률` 필드**. 파이프라인 종료 시 전체 Phase 합산 1행 요약. `**외부 LLM 활용률**: Phase 1 75% / Phase 3 50% (합산 66%)`.
+
+### Changed
+
+- `CONTRACT.md §8.6` 을 3 하위절로 재편 (§8.6.1 Phase 시작 현황판, §8.6.2 Live Call 실시간, §8.6.3 Phase 종료 집계, §8.6.4 전 레이어 금지 항목 통합). 기존 v0.7.0 현황판 · v0.7.0 폴백 배지 규약은 §8.6.1 로 흡수되어 동작 변화 없음.
+- `skills/run/SKILL.md` 의 LLM 호출 배지 섹션을 3 레이어 구조로 재작성. 출력 포맷에 `외부 LLM 활용률` 행 추가.
+- `agents/orchestrator.md` 의 LLM 호출 배지 섹션에 레이어 2·3 설명 및 예시 추가.
+
+### Version bump
+
+- `.claude-plugin/plugin.json` / `marketplace.json`: 0.8.0 → 0.8.1
+- `mcp-servers/gemini-architect/server.py` `SERVER_VERSION`: 0.8.0 → 0.8.1
+- `README.md` version 배지: 0.8.0 → 0.8.1
+
+### Security
+
+보안 불변식은 v0.8.0 그대로 유지. **추가 불변식** (실시간 배지 확장으로 인한 신규 리스크 차단):
+
+- 모든 레이어에서 API 키·Authorization·토큰·`GEMINI_API_KEY`·`user_config.gemini_api_key` 문자열 절대 포함 금지
+- 실시간 배지 (`§8.6.2`) 에서 프롬프트 본문·응답 본문 원문 출력 금지 — bytes/ms/상태 메타데이터만 허용
+- 실패 `<reason>` 에 오류 메시지의 헤더·응답 본문은 포함하지 않고 짧은 요약만 (HTTP 상태코드, 타임아웃, 스키마 위반 등)
+
+### Migration
+
+사용자 설정 변경 불필요. `/reload-plugins` 후 다음 `/ensembra:run` 부터 자동 적용. `logging.show_transport_badge: false` 로 3 레이어 **모두** 억제 가능 (단일 토글, 부분 토글 없음).
+
+### Design rationale (실시간 배지)
+
+v0.8.0 은 외부 LLM 활용 폭을 크게 넓혔지만 **실제 돌고 있는지 불가시** 했다. 사용자 관점에서 "Phase 1 배지 출력 → 몇 초~수십 초 정적 구간 → 다음 출력" 사이에 MCP/Ollama 가 정말 호출되는지, 실패해서 Claude 로 조용히 폴백되는지를 구분할 수 없었다. v0.8.1 은 호출 시작·완료 타임스탬프 레벨 배지를 도입해:
+
+1. **투명성**: 외부 LLM 실제 사용 여부를 사용자가 눈으로 확인 — v0.8.0 의 "외부 LLM 최대 활용" 슬로건이 구호가 아니라 측정 가능한 숫자가 됨
+2. **디버깅**: GEMINI_API_KEY 만료·Ollama 다운·네트워크 지연 등 Transport 장애를 즉시 식별
+3. **비용 통제**: 외부 LLM 활용률이 낮게 나오면 Claude 토큰이 의도치 않게 쓰이는 중임을 인지 → 설정 점검 유도
+
+"개별 호출 시간 측정" 자체는 성능 오버헤드가 무시할 수준 (wall-clock timestamp 2회) 이고, 배지 렌더링 비용도 라인당 수십 바이트로 전체 토큰 영향 미미.
+
 ## [0.8.0] — 2026-04-17
 
 ### Added (Debate/Audit 분리 원칙 — unanimous 만장일치)

@@ -317,29 +317,92 @@ Performer 는 이종(heterogeneous) 이다. Conductor 는 각 Performer 의 `tra
 
 **Health Check**: Phase 0 직전에 MCP server 가용 여부를 확인한다. MCP tool-use 호출이 가능한지 Claude Code 에 위임. 불가 시 즉시 다음 폴백으로 전환하고 배지 출력.
 
-### 8.6 LLM 호출 배지 규약 (v0.7.0+)
+### 8.6 LLM 호출 배지 규약 (v0.7.0+, v0.8.1 Live Indicators)
 
-Conductor 는 `config.json logging.show_transport_badge: true` (기본) 일 때 외부 LLM 호출 현황을 배지로 출력한다.
+Conductor 는 `config.json logging.show_transport_badge: true` (기본) 일 때 외부 LLM 호출 현황을 배지로 출력한다. 배지는 **3 레이어** 로 구성된다 — (1) Phase 시작 현황판, (2) 개별 호출 실시간 표시(v0.8.1+), (3) Phase 종료 집계(v0.8.1+).
 
-**Phase 1 시작 시**: 전체 Performer 의 Transport/Model 계획을 한 번에 표시.
+#### 8.6.1 Phase 시작 현황판 (v0.7.0+)
+
+Phase 1 R1 / Phase 3 Audit 시작 직전 **1회** 전체 Performer 의 Transport/Model 계획을 한 번에 표시.
 
 ```
 📡 Phase 1 R1 — Transport 현황:
   [Gemini  ] architect  → gemini-2.5-flash  @ MCP(gemini-architect)
   [Ollama  ] security   → qwen2.5:14b       @ localhost:11434
-  [Ollama  ] qa         → llama3.1:8b        @ localhost:11434
-  [Claude  ] planner    → opus              @ subagent
+  [Ollama  ] qa         → llama3.1:8b       @ localhost:11434
+  [Claude  ] planner    → sonnet            @ subagent    (v0.8.0 opus→sonnet)
   [Claude  ] developer  → sonnet            @ subagent
   [Claude  ] devils-adv → haiku             @ subagent
 ```
 
-**폴백 발생 시**: 기존 `⚠` 배지에 실제 사용된 Transport 를 추가.
+#### 8.6.2 개별 호출 실시간 배지 (v0.8.1+)
+
+각 Performer 호출의 **시작·완료·폴백·최종실패** 이벤트를 개별 라인으로 출력한다. 사용자가 "외부 LLM 이 지금 실제로 돌고 있는가" 를 시각적으로 확인할 수 있게 한다 (v0.8.0 까지는 Phase 시작 1회 배지 외에는 호출 진행이 불가시했음).
+
+| 이벤트 | 심볼 | 포맷 |
+|---|---|---|
+| 호출 시작 | `▶` | `▶ [<Transport>] <role> — 호출 시작 (<model> @ <endpoint>)` |
+| 호출 완료 | `◀` | `◀ [<Transport>] <role> — 응답 수신 (<ms>ms, <bytes>B)` |
+| 호출 실패/폴백 | `⚠` | `⚠ [<Transport>] <role> — <reason> → <next-transport> 폴백` |
+| 최종 체인 소진 | `✗` | `✗ [<Transport>] <role> — transport-chain-exhausted, Performer.status=error` |
+
+**예시 (architect 가 MCP 실패 → Ollama 성공)**:
+```
+▶ [Gemini  ] architect — 호출 시작 (gemini-2.5-flash @ MCP(gemini-architect))
+⚠ [Gemini  ] architect — HTTP 429 rate limit → Ollama 폴백
+▶ [Ollama  ] architect — 호출 시작 (qwen2.5:14b @ localhost:11434)
+◀ [Ollama  ] architect — 응답 수신 (4721ms, 2.3KB)
+```
+
+**실시간 배지 필드 규약**:
+- `<Transport>` : `Gemini` / `Ollama` / `Claude` (사람이 읽는 이름. 내부 transport 식별자와 다를 수 있음)
+- `<model>` : 모델 ID 그대로. `gemini-2.5-flash`, `qwen2.5:14b`, `sonnet`, `haiku`, `opus`
+- `<endpoint>` : MCP 는 `MCP(<server_name>)`, Ollama 는 호스트만(`localhost:11434`, 포트 포함, 경로·쿼리스트링 금지), Claude 는 `subagent`
+- `<ms>` : wall-clock 밀리초. 1000 이하면 `<1000ms`, 이상이면 `1234ms` 형식
+- `<bytes>` : 응답 본문 바이트 (`===ENSEMBRA-OUTPUT===` 블록 포함 전체). 1024 이상이면 KB 단위 소수 1자리(`2.3KB`), 미만이면 바이트(`812B`)
+- `<reason>` : 실패 원인 1줄 요약. HTTP 상태코드, 타임아웃, 스키마 위반 등
+
+**보안 불변식 (실시간 배지에서도 유지)**:
+- API 키·Authorization 헤더·토큰 **절대 출력 금지** (§8.6.4 금지 항목 참조)
+- MCP stdio payload 원문·Ollama request body·프롬프트 본문 **출력 금지** — 길이(bytes)·소요시간(ms) 만 노출
+- `<reason>` 은 오류 메시지에서 헤더·응답 본문을 제외한 짧은 문자열만 (GEMINI_API_KEY 같은 키가 에러에 포함돼 있어도 Conductor 가 마스킹 후 출력)
+
+#### 8.6.3 Phase 종료 집계 배지 (v0.8.1+)
+
+Phase 1·3 종료 시 각 1회 해당 Phase 의 외부 LLM 호출 통계를 출력한다.
 
 ```
-⚠ architect: gemini-2.5-flash (MCP) 실패 → ollama/qwen2.5:14b (fallback)
+📊 Phase 1 외부 LLM 호출 집계:
+  MCP(Gemini)    2회 호출 / 2 성공 / 0 폴백
+  Ollama         2회 호출 / 1 성공 / 1 폴백
+  Claude 폴백    1회
+  외부 LLM 활용률: 3/4 (75%)
 ```
 
-**배지 금지 항목**: 배지에 API 키, Authorization 헤더, 인증 토큰은 절대 포함하지 않는다. 모델명 + endpoint 호스트명만 표시.
+**"외부 LLM 활용률" 정의**:
+```
+활용률 = (MCP 성공 호출 수 + Ollama 성공 호출 수) / (해당 Phase 의 Performer 호출 총 수) × 100
+```
+- 분모: 실제 호출된 Performer 수 (R2 에서 skip 된 Performer 는 제외)
+- 분자: transport_chain 에서 외부(MCP/Ollama) 단계가 성공적으로 응답 반환한 건수. 폴백 결과로 Claude 가 실제 처리한 건은 분자 제외
+- 한 Performer 가 여러 단계에서 재시도해 성공한 경우 `MCP 실패 → Ollama 성공` 은 Ollama 성공 1건으로 집계
+
+**활용률 해석 가이드**:
+- `≥ 70%`: 외부 LLM 우선 정책이 정상 동작 중. Claude 토큰 절감 목표 달성
+- `40~70%`: 일부 외부 Transport 불안정. Ollama 엔드포인트·GEMINI_API_KEY 점검 권장
+- `< 40%`: 외부 경로 대부분 실패 중. 구조적 진단 필요 — 이 경우 Conductor 는 다음 Phase 로 진입하지 않고 사용자에게 경고 배지 한 번 더 출력
+
+**최종 출력 포맷 통합 (§skills/run)**: 파이프라인 종료 시 전체 Phase 합산을 1행 요약:
+```
+**외부 LLM 활용률**: Phase 1 75% / Phase 3 50% (합산 66%)
+```
+
+#### 8.6.4 배지 금지 항목 (전 레이어 공통)
+
+- 배지에 API 키, Authorization 헤더, 인증 토큰, GEMINI_API_KEY·user_config.gemini_api_key 문자열 절대 포함 금지
+- 모델명 + endpoint 호스트명만 표시. 전체 URL(쿼리스트링·키 파라미터) 금지
+- 실시간 배지에서 프롬프트 본문·응답 본문 출력 금지 — 메타데이터(길이·소요시간·상태) 만 허용
+- `logging.show_transport_badge: false` 설정 시 §8.6.1 / §8.6.2 / §8.6.3 **3 레이어 모두** 억제 (단일 토글, 선택적 활성화 없음 — 설정 일관성)
 
 ### 8.7 라운드 피로도 대응
 
