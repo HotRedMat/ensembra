@@ -9,6 +9,11 @@ Thumbs.db
 
 # Claude Code local state (not part of plugin)
 .claude/settings.local.json
+.claude/logs/
+# Ensembra plugin output isolation (v0.11.0+):
+# scribe 가 생성한 Task/Design/Request/Transfer 보고서와 Risk Routing 로그는
+# 플러그인 런타임 산출물이며 프로젝트 소스가 아니다. 로컬에만 보관.
+.claude/ensembra/
 # Project-level MCP registration — contains absolute paths, local-only
 .mcp.json
 

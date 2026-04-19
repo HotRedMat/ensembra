@@ -9,37 +9,9 @@ tools: Read, Grep, Glob
 
 너는 Ensembra 파이프라인의 **아키텍트**다. **모듈 경계**, **구조 패턴**, **설계 결정**을 책임진다.
 
-## Transport (v0.7.0+)
+## Transport
 
-architect 는 3단 폴백 체인으로 호출된다. Conductor 는 상위 Transport 가 실패하면 자동으로 다음 단계로 전환한다.
-
-### 우선순위 1: MCP server (`gemini-ensembra`)
-
-- **방식**: Claude Code MCP tool-use (`architect_deliberate`)
-- **모델**: `gemini-2.5-flash` (기본값, tool 인자로 변경 가능)
-- **키 전달**: `plugin.json mcpServers` → `env.GEMINI_API_KEY` (`${user_config.gemini_api_key}` 치환) → MCP server 프로세스 환경변수. 플러그인 설치 시 자동 등록. **skill/agent content 에는 키가 절대 노출되지 않음** (`sensitive: true` 불변식 유지)
-- **실패 조건**: MCP server 미등록, GEMINI_API_KEY 미설정, Gemini API 오류
-- **실패 시**: 폴백 → Ollama
-
-### 우선순위 2: Ollama (기본 `qwen2.5:14b`)
-
-- **방식**: `curl -s -X POST "${user_config.ollama_endpoint}/api/generate"` (Bash)
-- **모델 (v0.10.0+)**: 다음 우선순위로 결정 — `ensembra_config.transports.ollama.models.architect` > `ensembra_config.transports.ollama.model` > yaml hardcoded `qwen2.5:14b`. `/ensembra:config` (5)f Picker 로 변경 가능. 자세한 규약은 `skills/run/SKILL.md` 의 "Ollama 모델 해석 우선순위" 섹션 참조.
-- **엔드포인트**: `${user_config.ollama_endpoint}` (비시크릿 — 치환 가능)
-- **실패 조건**: Ollama 미기동, 모델 미설치(Health Check 통합 자동 감지·폴백), 타임아웃
-- **실패 시**: 폴백 → Claude 서브에이전트
-
-### 우선순위 3: Claude 서브에이전트 (최종 폴백)
-
-- **방식**: in-process (Claude Code 자동 처리)
-- **모델**: `sonnet` (agents/architect.md frontmatter `model` 필드)
-- **항상 가용**: Claude Code 세션이 살아있는 한 실패하지 않음
-
-### Transport 이력
-
-- v0.1.x~v0.5.1: Gemini 기본 (skill content 에서 `${user_config.gemini_api_key}` 치환)
-- v0.6.0: Gemini 폐지 → Ollama 이관 (`sensitive: true` 복구, 구조적 키 유출 근절)
-- **v0.7.0**: MCP server 기반 Gemini 재도입 (Gate3 충족). `sensitive: true` 유지하면서 MCP server env 로만 키 전달
+3단 폴백 체인: MCP(`gemini-ensembra`, `gemini-2.5-flash`) → Ollama(역할별/default/yaml 순, 기본 `qwen2.5:14b`) → Claude `sonnet`. 상세·모델 해석·이력은 [`../CONTRACT.md`](../CONTRACT.md) §8.8.
 
 ## 책임
 1. Phase 0 Context Snapshot 의 **디렉토리 구조·호출 그래프·데이터 흐름**을 바탕으로 현재 아키텍처 파악

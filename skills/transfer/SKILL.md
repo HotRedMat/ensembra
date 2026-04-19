@@ -13,9 +13,9 @@ disable-model-invocation: false
 
 ## 인자 파싱
 `$ARGUMENTS` 를 scope 로 해석:
-- **인자 없음**: 프로젝트 전체 → 파일명 `docs/transfer/{YYYY-MM-DD}-project.md`
-- **경로** (`/` 포함): 해당 디렉토리 → 파일명 `docs/transfer/{YYYY-MM-DD}-{path-slug}.md`
-- **자연어** (예: "결제 모듈"): planner 가 파일 집합 추론 → 파일명 `docs/transfer/{YYYY-MM-DD}-{slug}.md`
+- **인자 없음**: 프로젝트 전체 → 파일명 `.claude/ensembra/transfer/{YYYY-MM-DD}-project.md`
+- **경로** (`/` 포함): 해당 디렉토리 → 파일명 `.claude/ensembra/transfer/{YYYY-MM-DD}-{path-slug}.md`
+- **자연어** (예: "결제 모듈"): planner 가 파일 집합 추론 → 파일명 `.claude/ensembra/transfer/{YYYY-MM-DD}-{slug}.md`
 
 ## 파이프라인
 
@@ -32,7 +32,7 @@ disable-model-invocation: false
    - 의존성: 전체 `package.json`/`pyproject.toml`/`Cargo.toml`
    - 설정: `.env.example`, `config/*`, `docker-compose.yml` 등
    - 공통 모듈 인벤토리: 전수
-   - 프로젝트 문서 인벤토리: `docs/reports/tasks/` + `docs/reports/weekly/` + `docs/design/` 전수
+   - 프로젝트 문서 인벤토리: `.claude/ensembra/reports/tasks/` + `.claude/ensembra/reports/weekly/` + `.claude/ensembra/design/` 전수 (v0.11.0+ 기본 경로)
 
 2. TODO/FIXME/XXX 주석 전수 집계 (`Grep` 여러 패턴)
 
@@ -88,7 +88,7 @@ scribe 는:
 - 7, 8, 9, 10 번 부록을 Wide Scan 결과로 자동 집계
 
 ## 저장
-- 파일 경로: `docs/transfer/{YYYY-MM-DD}-{scope}.md`
+- 파일 경로: `.claude/ensembra/transfer/{YYYY-MM-DD}-{scope}.md`
 - 디렉토리 없으면 `mkdir -p`
 - `Write` 로 저장
 
@@ -104,7 +104,7 @@ Wide Scan 이 길어질 수 있으므로 단계별 진행률 출력:
 Phase 0 Wide Scan ... (1/3 완료)
 Phase 1 섹션 작성 ... 2/6 Performer 완료
 Phase 4 scribe 취합 ...
-✅ docs/transfer/2026-04-15-project.md 생성 완료
+✅ .claude/ensembra/transfer/2026-04-15-project.md 생성 완료
 ```
 
 ## 보안

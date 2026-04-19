@@ -2,9 +2,15 @@
 
 Handles prompt assembly (system + user), generationConfig, and error masking.
 Never includes the API key in error messages.
+
+v0.11.0+ request-body scrubber: before the prompt is sent to Gemini, a
+pattern-based redactor masks common secret formats (API keys, bearer tokens,
+.env key=value lines). Defence-in-depth — the caller SHOULD already filter,
+but a Context Snapshot accidentally pasting an .env excerpt must not leak.
 """
 
 import json
+import re
 import sys
 import time
 import urllib.error
@@ -18,6 +24,47 @@ DEFAULT_MAX_OUTPUT_TOKENS = 8192
 ERROR_BODY_SNIPPET_LIMIT = 240
 MAX_RETRIES_5XX = 1
 RETRY_BACKOFF_SEC = 1.0
+
+# ---------------------------------------------------------------------------
+# Outbound secret scrubber (v0.11.0+)
+# ---------------------------------------------------------------------------
+#
+# Patterns chosen for common keys that a Context Snapshot may accidentally
+# carry. Intentionally conservative — these redact to "[REDACTED:<kind>]" so
+# the model still sees that *something* was there (for reasoning) but never
+# the value.
+
+_SCRUB_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
+    ("gemini",    re.compile(r"AIza[0-9A-Za-z_\-]{20,}")),
+    ("openai",    re.compile(r"sk-[A-Za-z0-9_\-]{20,}")),
+    ("anthropic", re.compile(r"sk-ant-[A-Za-z0-9_\-]{20,}")),
+    ("github",    re.compile(r"gh[pousr]_[A-Za-z0-9]{20,}")),
+    ("slack",     re.compile(r"xox[abprs]-[A-Za-z0-9\-]{10,}")),
+    ("aws",       re.compile(r"AKIA[0-9A-Z]{16}")),
+    ("jwt",       re.compile(r"eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}")),
+    ("bearer",    re.compile(r"(?i)(?:Authorization\s*:\s*)?Bearer\s+[A-Za-z0-9_\-\.=]{16,}")),
+]
+
+# .env-style KEY=VALUE lines where KEY hints at a secret. Masks the VALUE.
+_ENV_SECRET_LINE = re.compile(
+    r"(?im)^(\s*(?:[A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|PRIVATE)[A-Z0-9_]*)\s*=\s*)(\S.*)$"
+)
+
+
+def scrub_outbound(text: str) -> str:
+    """Redact likely secrets from text that will be sent to an external LLM.
+
+    Redaction is done in-place per pattern. This is a best-effort defensive
+    layer — callers must still avoid putting secrets in prompts. Never logs
+    the matched value (only the kind label).
+    """
+    if not text:
+        return text
+    out = text
+    for kind, pattern in _SCRUB_PATTERNS:
+        out = pattern.sub(f"[REDACTED:{kind}]", out)
+    out = _ENV_SECRET_LINE.sub(r"\1[REDACTED:env]", out)
+    return out
 
 
 def _extract_error_detail(exc: urllib.error.HTTPError, api_key: str) -> str:
@@ -81,6 +128,12 @@ def call_gemini(
         masking) so callers can distinguish quota / rate-limit / 5xx causes.
     """
     api_key = resolve_api_key()
+
+    # Outbound scrub: mask likely secrets before the prompt leaves the host.
+    # System prompt is authored by us (roles/*.py) so we trust it; user_prompt
+    # may carry Context Snapshot excerpts that accidentally include an .env
+    # line or API key.
+    user_prompt = scrub_outbound(user_prompt)
 
     # Assemble contents: system prompt as first turn if provided
     contents = []

@@ -17,7 +17,7 @@ disable-model-invocation: false
 
 ### 입력 수집
 1. 오늘 날짜 획득: `Bash date +%Y-%m-%d`
-2. `docs/reports/tasks/{YYYY-MM-DD}-*.md` 파일 목록 수집 (`Glob`)
+2. `.claude/ensembra/reports/tasks/{YYYY-MM-DD}-*.md` 파일 목록 수집 (`Glob`)
 3. 각 Task Report `Read` 로 파싱:
    - 제목 (프로젝트 slug)
    - 프리셋
@@ -50,7 +50,7 @@ disable-model-invocation: false
 ```
 
 ### 저장
-`docs/reports/daily/{YYYY-MM-DD}.md`
+`.claude/ensembra/reports/daily/{YYYY-MM-DD}.md`
 
 ## Weekly Report
 
@@ -59,7 +59,7 @@ disable-model-invocation: false
 2. 주의 시작일·종료일 계산 (월요일~일요일)
 
 ### 입력 수집
-1. 해당 주의 Daily Report 들 `Glob` (`docs/reports/daily/YYYY-MM-DD.md` 최대 7개)
+1. 해당 주의 Daily Report 들 `Glob` (`.claude/ensembra/reports/daily/YYYY-MM-DD.md` 최대 7개)
 2. 각 Daily `Read` 로 파싱
 3. 해당 주의 모든 Task Report 도 직접 수집 (Daily 누락분 대비)
 
@@ -84,14 +84,14 @@ disable-model-invocation: false
 - Ollama fallback: {count}회
 
 ## 주요 설계 결정 (Design Doc 변경 집계)
-- docs/design/{feature}.md 에 추가된 섹션들
+- .claude/ensembra/design/{feature}.md 에 추가된 섹션들
 
 ## 다음 주 우선순위
 - Daily 의 "내일 우선순위" 섹션에서 중복 제거 후 집계
 ```
 
 ### 저장
-`docs/reports/weekly/{YYYY}-W{week}.md`
+`.claude/ensembra/reports/weekly/{YYYY}-W{week}.md`
 
 ## scribe 호출
 실제 보고서 작성은 scribe Performer 에게 위임:

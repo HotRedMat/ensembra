@@ -24,7 +24,7 @@ Phase 4 시작 시 scribe 는 파이프라인 전체 기록을 받는다:
 ## 5종 문서 (`CONTRACT.md` §15)
 
 ### 1. Task Report (ADR 스타일) — 강제 생성
-경로: `docs/reports/tasks/{YYYY-MM-DD}-{slug}.md`
+경로: `.claude/ensembra/reports/tasks/{YYYY-MM-DD}-{slug}.md` (v0.11.0+ 기본, `reports.path_tasks` 로 오버라이드)
 섹션: 요청 / 컨텍스트 / 토론 요약 / 결정된 Plan / 구현 / 검증 / 재사용 기회 평가 / 후속 조치 / **외부 LLM 사용 증거 (Proof-of-Invocation, v0.9.1+ 강제)**
 
 #### 외부 LLM 사용 증거 섹션 (v0.9.1+ 강제 포함)
@@ -49,19 +49,19 @@ Task Report 맨 아래에 다음 형식의 표를 **필수 포함**. `CONTRACT.m
 본 섹션은 `config.json reports.task_report_proof_section: false` 설정이 **명시적으로** 있을 때만 생략 가능 (기본 true, 비권장). 본문 상단 섹션들과 달리 이 증거 섹션은 프로파일·tier 와 무관하게 모든 실행에서 기록된다.
 
 ### 2. Design Doc — feature/refactor 프리셋에서만
-경로: `docs/design/{feature}.md` (append 모드, 덮어쓰기 금지)
+경로: `.claude/ensembra/design/{feature}.md` (append 모드, 덮어쓰기 금지)
 기존 파일이 있으면 새 섹션 추가. 사용자 수동 편집 부분 보존.
 
 ### 3. Request Spec — feature/refactor 프리셋에서만
-경로: `docs/requests/{YYYY-MM-DD}-{slug}.md`
+경로: `.claude/ensembra/requests/{YYYY-MM-DD}-{slug}.md`
 planner 가 정식화한 요구사항 + 수용 기준 + 관련 태스크 링크.
 
 ### 4. Daily Report — 수동 호출 `/ensembra:report daily`
-경로: `docs/reports/daily/{YYYY-MM-DD}.md`
+경로: `.claude/ensembra/reports/daily/{YYYY-MM-DD}.md`
 그 날의 Task Report 집계 + 통계 + 열린 항목.
 
 ### 5. Weekly Report — 수동 호출 `/ensembra:report weekly`
-경로: `docs/reports/weekly/{YYYY-Www}.md`
+경로: `.claude/ensembra/reports/weekly/{YYYY-Www}.md`
 Daily Report roll-up + Performer 사용 통계 + 다음 주 우선순위.
 
 ## 인수인계서 (`transfer` 프리셋 특수 모드)

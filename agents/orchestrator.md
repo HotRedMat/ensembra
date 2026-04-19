@@ -35,49 +35,9 @@ Phase 3 Audit      — 프리셋별 감사자가 diff 검증, Rework 상한 2회
 Phase 4 Document   — scribe 가 결과물 문서화 (Task Report 강제)
 ```
 
-## LLM 호출 배지 (v0.7.0+ · v0.8.1 Live Indicators 3 레이어)
+## LLM 호출 배지
 
-Conductor 는 `config.json logging.show_transport_badge: true` (기본) 일 때 3 레이어 배지를 출력한다 (`CONTRACT.md §8.6`).
-
-- **레이어 1** (v0.7.0+) — Phase 시작 현황판: Phase 1 R1 / Phase 3 직전 1회, 전 Performer 의 Transport/Model 계획 일괄 표시
-- **레이어 2** (v0.8.1+) — 개별 호출 실시간 배지: 각 호출의 시작(`▶`)·완료(`◀`)·폴백(`⚠`)·최종실패(`✗`) 를 실시간 라인으로 출력. 외부 LLM 이 실제 돌고 있는지 사용자가 시각 확인
-- **레이어 3** (v0.8.1+) — Phase 종료 집계(`📊`): MCP/Ollama/Claude 호출 횟수 + **외부 LLM 활용률** 1회 요약
-
-보안 불변식: 모든 레이어에서 API 키·프롬프트·응답 본문 출력 금지. bytes/ms/상태 메타데이터만 노출.
-
-```
-📡 Phase 1 R1 — Transport 현황 (v0.8.0+):
-  [Gemini  ] architect     → gemini-2.5-flash  @ MCP(gemini-ensembra)
-  [Ollama  ] security      → qwen2.5:14b       @ localhost:11434
-  [Ollama  ] qa            → qwen2.5:14b       @ localhost:11434
-  [Claude  ] planner       → sonnet            @ subagent
-  [Claude  ] developer     → sonnet            @ subagent    (opt-in 외부 체인 off)
-  [Claude  ] devils-adv    → haiku             @ subagent
-
-📡 Phase 3 Audit — 예정 순서:
-  [Claude  ] architect     → sonnet            @ subagent
-  [Claude  ] devils-adv    → haiku             @ subagent
-  [⚖ opus ] final-auditor  → opus              @ subagent    (만장일치 판정)
-```
-
-레이어 2 실시간 배지 예시 (architect MCP 실패 → Ollama 성공):
-```
-▶ [Gemini  ] architect — 호출 시작 (gemini-2.5-flash @ MCP(gemini-ensembra))
-⚠ [Gemini  ] architect — HTTP 429 rate limit → Ollama 폴백
-▶ [Ollama  ] architect — 호출 시작 (qwen2.5:14b @ localhost:11434)
-◀ [Ollama  ] architect — 응답 수신 (4721ms, 2.3KB)
-```
-
-레이어 3 집계 예시:
-```
-📊 Phase 1 외부 LLM 호출 집계:
-  MCP(Gemini)    2회 / 2 성공 / 0 폴백
-  Ollama         2회 / 1 성공 / 1 폴백
-  Claude 폴백    1회
-  외부 LLM 활용률: 3/4 (75%)
-```
-
-배지는 Phase 0~4 전 구간에서 동일한 포맷을 사용한다. Phase 3 직전에 감사 순서를 별도 배지로 1회 출력하고 (final-auditor 위치 강조), Phase 1·3 각 종료 시 `📊` 집계 배지를 1회 출력한다.
+Conductor 는 `logging.show_transport_badge: true` (기본) 일 때 3 레이어 배지 + v0.9.1+ Proof-of-Invocation 4종을 출력한다. 상세 포맷·예시·금지선은 [`../CONTRACT.md`](../CONTRACT.md) §8.6 (레이어 1~3) 및 §8.6.5 (PoI) 를 정본으로 한다. API 키·프롬프트·응답 본문 출력 금지, bytes/ms/상태 메타데이터만 허용.
 
 ## 책임
 1. `problem` 문자열을 고정하고 라운드 중간 재해석 금지

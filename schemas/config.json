@@ -171,8 +171,13 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 72,
-          "default": 6,
-          "description": "v0.9.2+. Deep Scan 캐시 유효 시간(시간). 기본 6시간. git HEAD 해시가 바뀌면 TTL 과 무관하게 무효화."
+          "default": 12,
+          "description": "v0.9.2+. Deep Scan 캐시 유효 시간(시간). 기본 12시간 (v0.11.0+ 연장 — git HEAD 해시가 바뀌면 TTL 과 무관하게 무효화되므로 안전)."
+        },
+        "docs_inventory_pro_off": {
+          "type": "boolean",
+          "default": true,
+          "description": "v0.11.0+. pro tier 에서 Deep Scan 항목 10(프로젝트 문서 인벤토리) 을 완전 off. 기본 true — ops/bugfix/refactor/feature preset 에서 docs/*, spec/*, requirements/* 등 5개 Glob 호출 제거 (~1,000 토큰/call 절감). source-analysis 와 security-audit preset 은 docs 분석이 핵심이므로 이 플래그 무시."
         },
         "cache_path": {
           "type": "string",
@@ -257,12 +262,13 @@
         "request_spec": { "type": "boolean", "default": true },
         "daily":        { "type": "boolean", "default": true },
         "weekly":       { "type": "boolean", "default": true },
-        "path_tasks":     { "type": "string", "default": "docs/reports/tasks" },
-        "path_daily":     { "type": "string", "default": "docs/reports/daily" },
-        "path_weekly":    { "type": "string", "default": "docs/reports/weekly" },
-        "path_design":    { "type": "string", "default": "docs/design" },
-        "path_requests":  { "type": "string", "default": "docs/requests" },
-        "path_transfer":  { "type": "string", "default": "docs/transfer" },
+        "path_tasks":     { "type": "string", "default": ".claude/ensembra/reports/tasks", "description": "v0.11.0+ 기본 경로 이관 (이전: docs/reports/tasks). 플러그인 산출물을 대상 프로젝트의 .claude/ 하위에 격리해 프로젝트 자체 docs/ 와 충돌 방지." },
+        "path_daily":     { "type": "string", "default": ".claude/ensembra/reports/daily" },
+        "path_weekly":    { "type": "string", "default": ".claude/ensembra/reports/weekly" },
+        "path_risk":      { "type": "string", "default": ".claude/ensembra/reports/risk", "description": "v0.11.0+. Risk Routing 로그 (runs.jsonl) 저장 디렉토리." },
+        "path_design":    { "type": "string", "default": ".claude/ensembra/design" },
+        "path_requests":  { "type": "string", "default": ".claude/ensembra/requests" },
+        "path_transfer":  { "type": "string", "default": ".claude/ensembra/transfer" },
         "language": {
           "type": "string",
           "enum": ["auto", "ko", "en"],

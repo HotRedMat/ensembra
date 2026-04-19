@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] — 2026-04-19 (토큰 비용 추가 절감 + 플러그인 출력 격리)
+
+### Changed — SKILL.md slim (56% 축소) · CONTRACT.md 정본 승격
+
+**문제 인식**: `skills/run/SKILL.md` 가 35.9KB (약 9,000 토큰) 로 매 `/ensembra:run` 호출 시 Conductor system prompt 에 inline 삽입. 상당 부분이 CONTRACT.md 와 중복 서술. 호출당 고정 토큰 비용이 불필요하게 높음.
+
+- `skills/run/SKILL.md` **35,962B / 766 lines → 15,655B / 302 lines (-56%)**. Stage A/B Risk Routing 상세, Transport 3단 폴백 상세, Ollama 모델 해석, Badge 4레이어 예시, Deep Scan 캐시 포맷 등 상세 규약을 모두 `CONTRACT.md` 로 이관하고 요약·분기·금지선만 유지.
+- `CONTRACT.md` **정본 승격** — §19 opening 의 "skills/run/SKILL.md 가 권위" 선언 반전. §19.6 (Stage A 흐름 + 점수표), §19.7 (Stage B 신호 가중치), §19.8 (Kill Switch 치명 신호 5종), §19.9 (자동 업그레이드 3모드 + 경로 매핑) 신규.
+- `agents/orchestrator.md`: Badge 섹션 54줄 → 1문단 (CONTRACT.md §8.6 참조).
+- `agents/architect.md`: Transport 섹션 32줄 → 1문단 (CONTRACT.md §8.8 참조).
+
+**예상 토큰 절감**: **약 5,500 토큰/call** (매 /ensembra:run 호출 시 system prompt 축소분).
+
+### Changed — Deep Scan 캐시 기본값 연장
+
+- `schemas/config.json` `deep_scan.cache_ttl_hours.default`: **6 → 12 시간**. git HEAD 해시 기반 무효화가 주 신호이므로 TTL 연장은 안전. Cache HIT 율 상승으로 반복 작업 환경에서 20~40% 토큰 절감.
+- `CONTRACT.md §20.4/§20.6` 동기화.
+
+### Added — Deep Scan 항목 10 pro tier off 플래그
+
+- `schemas/config.json` 신규 필드 `deep_scan.docs_inventory_pro_off` (기본 `true`).
+- pro tier + 이 플래그가 true 면 Deep Scan 항목 10 (프로젝트 문서 인벤토리 Glob 5회) 을 완전 생략. `source-analysis`·`security-audit` preset 은 플래그 무시하고 항상 수행 (docs 분석이 핵심).
+- **예상 토큰 절감**: 약 1,000 토큰/call.
+
+### Added — Outbound 시크릿 스크러버 (HIGH 보안)
+
+- `mcp-servers/gemini-ensembra/gemini_client.py` 에 신규 함수 `scrub_outbound()` 추가.
+- `call_gemini()` 는 API 요청 본문 전송 **직전** 에 user_prompt 를 자동 마스킹:
+  - 8 정규식 패턴: Gemini/OpenAI/Anthropic/GitHub/Slack/AWS/JWT/Bearer
+  - `.env` 스타일 `KEY=VALUE` 라인 (KEY 에 KEY/TOKEN/SECRET/PASSWORD/PRIVATE 포함 시 VALUE 마스킹)
+- 자가 테스트 8/8 통과 (plain text 무변경, 모든 시크릿 `[REDACTED:*]` 치환).
+- 목적: Context Snapshot 이 `.env` 내용 등을 우연히 포함할 때 외부 LLM (Gemini/Ollama) 으로 평문 송신 방지. 기존 응답 본문 마스킹(§8.1)에 대칭되는 요청 본문 방어.
+
+### Changed — 플러그인 출력 격리 (docs/ → .claude/ensembra/)
+
+**문제 인식**: `docs/reports/tasks/`, `docs/design/`, `docs/requests/`, `docs/transfer/` 는 대상 프로젝트 자체의 `docs/` 와 경로 충돌. 사용자가 자기 프로젝트 문서를 `docs/` 에 보관하면 플러그인 런타임 산출물과 섞임.
+
+- `schemas/config.json` 의 `reports.path_*` 6개 기본값을 `.claude/ensembra/...` 로 이관:
+  - `path_tasks`: `docs/reports/tasks` → `.claude/ensembra/reports/tasks`
+  - `path_daily/weekly/design/requests/transfer` 동일 패턴 이관
+  - 신규 `path_risk`: `.claude/ensembra/reports/risk` (Risk Routing 로그)
+- `CONTRACT.md §15.2, §15.4, §8.6.5, §19.4` · `agents/scribe.md` · `skills/report/SKILL.md` · `skills/transfer/SKILL.md` · `skills/run/SKILL.md` · `README.md` · `examples/quickstart.md` 모두 신규 경로로 참조 갱신.
+- **Ensembra 자체 레포 정리**: 기존 `docs/` 하위 19개 플러그인 생성 파일을 `.claude/ensembra/` 로 `git mv` 후 `git rm --cached` 처리. 로컬 디스크엔 보존되지만 git 추적에서 제외.
+- `.gitignore` 에 `.claude/ensembra/` + `.claude/logs/` 추가 (플러그인 런타임 산출물 격리). 이전 세션에서 임시 추가되었던 `docs/` 일괄 제외 규칙은 제거 (프로젝트 자체 `docs/` 는 다시 추적 가능).
+
+**사용자 영향**: 하위 호환 유지 (`reports.path_*` 사용자 오버라이드 지정돼 있으면 그 값 우선). v0.10.0 이하에서 v0.11.0 업그레이드 시 과거 `docs/` 위치의 기록은 수동 이동 또는 그대로 방치 가능 (scribe 는 신 경로에 새로 작성).
+
+### Security
+
+- 외부 LLM 경로에 대한 송신 본문 자동 스크러빙으로 `sensitive: true` 불변식 확장.
+- 플러그인 출력을 `.claude/` 하위로 격리해 대상 프로젝트 git 에 의도치 않게 커밋되는 경로 제거.
+
+### Migration
+
+기존 사용자:
+- 별도 조치 불필요. 신규 실행부터 `.claude/ensembra/` 에 산출물 생성.
+- 과거 `docs/` 위치의 기록은 그대로 두거나 수동 이동 (선택).
+- `reports.path_*` 를 명시 지정한 사용자는 그 설정 유지됨.
+
 ## [0.10.0] — 2026-04-17 (Ollama 모델 동적 선택 — default + 역할별 override)
 
 ### Added — 사용자가 설치된 모델을 picker 로 선택

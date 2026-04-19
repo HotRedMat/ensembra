@@ -467,14 +467,14 @@ Claude 가 기본 경로인 경우 (max-plan 의 planner 등):
   ✗ developer    Claude  sonnet (primary)               ← 내부 (max-plan 기본)
   
   외부 LLM 활용률: 3/5 (60%)
-  ⓘ 폴백 사유 별도 기록 (docs/reports/risk/runs.jsonl)
+  ⓘ 폴백 사유 별도 기록 (.claude/ensembra/reports/risk/runs.jsonl)
 ```
 
 기존 §8.6.3 집계는 유지하며 본 표가 **상위에 추가 노출**된다.
 
 **C. Task Report 영구 기록 — Proof-of-Invocation 섹션**
 
-scribe 가 생성하는 Task Report (`docs/reports/tasks/{YYYY-MM-DD}-{slug}.md`) 맨 아래에 "외부 LLM 사용 증거" 섹션을 **강제 포함**. 사후 감사 가능한 파일 기록.
+scribe 가 생성하는 Task Report (`.claude/ensembra/reports/tasks/{YYYY-MM-DD}-{slug}.md` — v0.11.0+ 기본 경로) 맨 아래에 "외부 LLM 사용 증거" 섹션을 **강제 포함**. 사후 감사 가능한 파일 기록.
 
 템플릿:
 ```markdown
@@ -658,7 +658,7 @@ Phase 시작 시점의 Transport 현황판(§8.6.1) 에 폴백 예측 정보 추
 
 #### 8.9.6 보안·로깅
 
-- 폴백 결정은 `docs/reports/risk/runs.jsonl` 에 append (user_choice 필드 포함)
+- 폴백 결정은 `.claude/ensembra/reports/risk/runs.jsonl` 에 append (user_choice 필드 포함)
 - API 키·에러 본문·프롬프트 내용 포함 금지 (HTTP status·timeout 사유만)
 - 사용자 `[3] 중단` 선택 시 pipeline.status=cancelled_by_user 로 종료
 
@@ -1066,7 +1066,7 @@ Ensembra 설정
 - c) Request Spec on/off (기본 on, feature·refactor 에만 적용)
 - d) Daily Report 템플릿 (표준 / 간략)
 - e) Weekly Report 템플릿 (표준 / 상세)
-- f) 보고서 출력 경로 (기본 `docs/reports/`, `docs/design/`, `docs/requests/`, `docs/transfer/`)
+- f) 보고서 출력 경로 (v0.11.0+ 기본 `.claude/ensembra/reports/`, `.claude/ensembra/design/`, `.claude/ensembra/requests/`, `.claude/ensembra/transfer/` — 플러그인 격리 정책)
 - g) 보고서 언어 (원 요청 언어 자동 / 한국어 고정 / English 고정)
 - h) 인수인계서 기본 scope (전체 / 대화형 묻기)
 - i) 인수인계서 템플릿 (표준 10섹션 / 간략 6섹션)
@@ -1114,13 +1114,15 @@ scribe 는 Phase 1~3 에 참여하지 않는 **기록 전용** Performer 다. Ph
 
 ### 15.2 scribe 가 생성하는 문서 5종
 
-| 문서 | 경로 | 프리셋 |
+**v0.11.0+**: 모든 산출물은 대상 프로젝트의 **`.claude/ensembra/`** 하위에 저장 (플러그인 격리 정책). 프로젝트 자체 `docs/` 와 분리되어 git 추적·문서 오염 없이 로컬 기록 가능. 경로는 `reports.path_*` 필드로 개별 오버라이드 가능.
+
+| 문서 | 기본 경로 | 프리셋 |
 |---|---|---|
-| **Task Report** (ADR 스타일) | `docs/reports/tasks/{YYYY-MM-DD}-{slug}.md` | 모든 프리셋 (강제, 끌 수 없음) |
-| **Design Doc** | `docs/design/{feature}.md` | `feature`, `refactor` (append 모드, 덮어쓰기 금지) |
-| **Request Spec** | `docs/requests/{YYYY-MM-DD}-{slug}.md` | `feature`, `refactor` |
-| **Daily Report** | `docs/reports/daily/{YYYY-MM-DD}.md` | 수동 호출 `/ensembra:report daily` |
-| **Weekly Report** | `docs/reports/weekly/{YYYY-Www}.md` | 수동 호출 `/ensembra:report weekly` |
+| **Task Report** (ADR 스타일) | `.claude/ensembra/reports/tasks/{YYYY-MM-DD}-{slug}.md` | 모든 프리셋 (강제, 끌 수 없음) |
+| **Design Doc** | `.claude/ensembra/design/{feature}.md` | `feature`, `refactor` (append 모드, 덮어쓰기 금지) |
+| **Request Spec** | `.claude/ensembra/requests/{YYYY-MM-DD}-{slug}.md` | `feature`, `refactor` |
+| **Daily Report** | `.claude/ensembra/reports/daily/{YYYY-MM-DD}.md` | 수동 호출 `/ensembra:report daily` |
+| **Weekly Report** | `.claude/ensembra/reports/weekly/{YYYY-Www}.md` | 수동 호출 `/ensembra:report weekly` |
 
 ### 15.3 scribe 품질 보장
 - **템플릿 슬롯 기반**: 자유 작문 아님. 각 섹션은 명시적 입력→슬롯 매핑
@@ -1149,10 +1151,10 @@ scribe 는 Phase 1~3 에 참여하지 않는 **기록 전용** Performer 다. Ph
 #### 표준 템플릿 (10 섹션)
 0. 요약 (scribe, 3~5줄) / 1. 프로젝트 목적·목표 / 2. 아키텍처 / 3. 빌드·실행·개발환경 / 4. 보안·시크릿·계정 / 5. 테스트 현황 / 6. ⚠ 주의할 함정 / 7. 최근 변경 이력 / 8. 열린 이슈·다음 단계 / 9. 참고 문서 / 10. 부록: 의존성 스냅샷
 
-#### scope 파라미터
-- 인자 없음 → 프로젝트 전체 (`docs/transfer/{YYYY-MM-DD}-project.md`)
-- 경로 → 해당 디렉토리 (`docs/transfer/{YYYY-MM-DD}-{path-slug}.md`)
-- 자연어 → planner 가 파일 집합 추론 (`docs/transfer/{YYYY-MM-DD}-{slug}.md`)
+#### scope 파라미터 (v0.11.0+ 기본 경로)
+- 인자 없음 → 프로젝트 전체 (`.claude/ensembra/transfer/{YYYY-MM-DD}-project.md`)
+- 경로 → 해당 디렉토리 (`.claude/ensembra/transfer/{YYYY-MM-DD}-{path-slug}.md`)
+- 자연어 → planner 가 파일 집합 추론 (`.claude/ensembra/transfer/{YYYY-MM-DD}-{slug}.md`)
 
 #### 생성 정책
 - **자동 생성 없음**. 사용자 명시 호출만
@@ -1295,7 +1297,7 @@ v0.9.0 에서 모든 Gemini 경유 호출은 **단일 MCP server** (`gemini-ense
 
 ## 19. Risk Routing (v0.9.0+)
 
-요청 텍스트와 Phase 0 Deep Scan 결과를 2단계로 분석해 preset·profile 을 자동 결정하는 체계. 세부 규약은 `skills/run/SKILL.md` 의 "Risk Routing — Stage A/B" 섹션이 권위. 본 섹션은 개요·정책 경계만 명시.
+요청 텍스트와 Phase 0 Deep Scan 결과를 2단계로 분석해 preset·profile 을 자동 결정하는 체계. **v0.11.0+ 본 섹션이 정본**. `skills/run/SKILL.md` 는 런타임 진입 요약만 보유.
 
 ### 19.1 설계 원칙
 
@@ -1303,7 +1305,7 @@ v0.9.0 에서 모든 Gemini 경유 호출은 **단일 MCP server** (`gemini-ense
 2. **2단계 판정**: Stage A (Gemini flash 텍스트 분류) + Stage B (Deep Scan 컨텍스트 재평가). 두 단계 점수 변동으로 업그레이드 판단.
 3. **안전 기본값**: 불확실하면 더 무거운 경로 선택. 자동화의 default 는 안전.
 4. **Kill Switch 별도 레이어**: 점수 누적으로 잡히지 않는 "한 방에 위험" 케이스를 잡는 안전망. `kill_switch: strict` 기본.
-5. **프로젝트 고유 키워드 발견**: 초기엔 범용 키워드로 시작, `docs/reports/risk/runs.jsonl` 로그로 프로젝트 고유 용어 학습.
+5. **프로젝트 고유 키워드 발견**: 초기엔 범용 키워드로 시작, `.claude/ensembra/reports/risk/runs.jsonl` 로그로 프로젝트 고유 용어 학습.
 
 ### 19.2 우선순위
 
@@ -1322,7 +1324,7 @@ v0.9.0 에서 모든 Gemini 경유 호출은 **단일 MCP server** (`gemini-ense
 
 ### 19.4 로깅 스키마
 
-`docs/reports/risk/runs.jsonl` — append-only, 한 실행당 한 줄.
+`.claude/ensembra/reports/risk/runs.jsonl` — append-only, 한 실행당 한 줄.
 
 ```json
 {
@@ -1387,7 +1389,7 @@ Conductor 는 bailout 시 사용자에게 1회 확인 프롬프트 (`pre_flight.
 
 #### 19.5.5 로깅
 
-Bailout 결정은 `docs/reports/risk/runs.jsonl` 에 기록 (기존 Risk Routing 로그와 같은 파일):
+Bailout 결정은 `.claude/ensembra/reports/risk/runs.jsonl` 에 기록 (기존 Risk Routing 로그와 같은 파일):
 
 ```json
 {
@@ -1403,6 +1405,111 @@ Bailout 결정은 `docs/reports/risk/runs.jsonl` 에 기록 (기존 Risk Routing
   "final_route": "bailout (no pipeline execution)"
 }
 ```
+
+### 19.6 Stage A 흐름 + 초기 경로 점수표
+
+Stage A Triage 는 Phase 0 진입 **이전** Gemini flash-lite (MCP `triage_request` tool) 로 수행. Bailout 판정 + 초기 경로 제안을 **한 호출**로 동시 수행.
+
+#### 19.6.1 Triage 입력 프롬프트 (요약)
+
+```
+요청: {user_input}
+레포 최상위: {top_dirs}
+위험 키워드(+5): config.risk_routing.critical_keywords
+위험 경로(+5):   config.risk_routing.critical_paths
+High 키워드(+3): config.risk_routing.high_keywords
+
+출력 JSON schema:
+{
+  "intent":              "bugfix|feature|refactor|ops|diagnosis|deployment|migration|question",
+  "detected_domain":     [...],
+  "action_type":         "read|add|modify|delete|replace",
+  "initial_risk_score":  0~20,
+  "confidence":          0.0~1.0,
+  "reasoning":           "한 문장",
+  "ensembra_needed":     true|false,
+  "bailout_reason":      "ensembra_needed=false 일 때",
+  "suggested_action":    "direct_edit|claude_chat|ensembra_*"
+}
+```
+
+`confidence < 0.6` 면 score +3 보수 가산.
+
+#### 19.6.2 초기 경로 점수표 (`ensembra_needed: true` 일 때)
+
+| 점수 | 제안 preset | 제안 profile |
+|-----|----------|-----------|
+| 0 (read-only + Critical 없음) | bailout (§19.5) | — |
+| 1~2 | 제안 생략 또는 `ops` | pro-plan |
+| 3~5 | `ops` | pro-plan |
+| 6~9 | `bugfix` | pro-plan |
+| 10~14 | `ops-safe` | pro-plan |
+| 15~19 | `feature` | max-plan |
+| 20+ | `feature` + 강제 전문 감사 전원 | max-plan |
+
+#### 19.6.3 사용자 확인 조건
+
+`risk_routing.mode == always_ask` 또는 초기 점수 ≥ 10 이면 프롬프트 `[1]권장 [2]낮추기 [3]직접지정 [4]Ensembra 생략 [5]취소`. `mode == staged` 이고 점수 <10 → 조용히 진행 (배지만). `mode == aggressive` → 항상 생략.
+
+### 19.7 Stage B 재평가 신호 가중치
+
+Phase 0 Deep Scan 산출물로 **추가 tool call 없이** 재평가. 가중치 합산으로 `refined_risk_score` 계산.
+
+| 신호 | 출처 | 가중치 |
+|---|---|---|
+| Blast Radius 1~5 호출자 | 호출 그래프 (항목 3) | +0 |
+| Blast Radius 6~20 호출자 | 호출 그래프 | +3 |
+| Blast Radius 20+ 호출자 | 호출 그래프 | +7 |
+| public export / API 경계 | 호출 그래프 | +5 |
+| 데이터 흐름: 로그만 | 데이터 흐름 (항목 4) | +0 |
+| 데이터 흐름: 캐시 접근 | 데이터 흐름 | +2 |
+| 데이터 흐름: DB write | 데이터 흐름 | +5 |
+| 데이터 흐름: 외부 API | 데이터 흐름 | +3 |
+| 데이터 흐름: 세션/인증 변경 | 데이터 흐름 | +10 (치명) |
+| 테스트 없음 | 테스트 맵 (항목 5) | +4 |
+| 테스트 없음 + 위 중첩 | 테스트 맵 | 추가 +3 |
+| 경로 `/auth/`·`/session/`·`/middleware/` | 구조 (항목 1) | +5 |
+| 경로 `/migrations/`·schema | 구조 | +7 |
+| 경로 `/payment/`·`/billing/` | 구조 | +6 |
+| 경로 `.env*`·`/config/` | 구조 | +4 |
+| git churn 30일 10+ 커밋 | git 히스토리 (항목 6) | +2 |
+| git 6개월 안정 | git 히스토리 | -1 |
+| 횡단 영향 (commons/shared/lib) | 공통 모듈 (항목 9) | +8 |
+
+### 19.8 Kill Switch 치명 신호
+
+점수 누적 없이 **즉시 강제 중단 + max-plan 승인 요구** (`kill_switch: strict` 기본):
+
+| 치명 신호 | 조건 |
+|---|---|
+| 세션/인증 상태 변경 | auth·session 파일 수정 + 테스트 없음 |
+| Schema migration | `/migrations/` 경로 + DROP/ALTER 액션 |
+| 환경변수 삭제·변경 | `.env*` 파일 DELETE/UPDATE |
+| public API 시그니처 변경 | exported 함수 시그니처 + 6+ 호출자 |
+| 위험 명령어 | `rm -rf`, `git push --force`, DB `TRUNCATE`/`DROP` |
+
+`kill_switch: warn` → 배지 경고만, `off` → 감지 비활성 (배지는 §19.3 불변식으로 유지).
+
+### 19.9 자동 업그레이드 3모드
+
+변동폭 = `refined_risk_score - initial_risk_score`.
+
+**`mode: always_ask`**: 변동 ≥ +3 이면 프롬프트, 미만이면 조용히 진행.
+
+**`mode: staged`** (기본 권장):
+- 변동 < `notify_threshold` (기본 3): 로그만
+- `notify_threshold` ≤ 변동 < `auto_upgrade_threshold` (기본 10): 배지 알림, 경로 유지
+- 변동 ≥ `auto_upgrade_threshold`: 자동 업그레이드 + 명시 알림
+- Kill Switch: 별도 레이어
+
+**`mode: aggressive`**: 변동 ≥ `notify_threshold` → 자동 업그레이드 (묻지 않음). Kill Switch: 별도 레이어.
+
+#### 업그레이드 경로 매핑
+
+- `ops` + pro-plan → `ops-safe` + pro-plan
+- `ops-safe` + pro-plan → `feature` + pro-plan
+- `feature` + pro-plan → `feature` + max-plan
+- `feature` + max-plan → `feature` + max-plan + 강제 전문 감사 전원 (최고 경로)
 
 ---
 
@@ -1432,13 +1539,26 @@ key = sha256(
 ### 20.3 캐시 파일 경로·포맷
 
 - 경로: `{deep_scan.cache_path}/phase0-{key}.json` (기본 `.ensembra/cache/phase0-{key}.json`)
-- 포맷: `skills/run/SKILL.md` Phase 0 섹션 참조
 - `.gitignore` 에 `.ensembra/cache/` 추가 (v0.9.2 기본값)
+- 파일 스키마:
+
+```json
+{
+  "schema_version": "0.11.0",
+  "cached_at": "ISO8601",
+  "git_head": "sha 7자+",
+  "preset": "ops|bugfix|refactor|...",
+  "plan_tier": "pro|max",
+  "request_intent": "bugfix|...",
+  "context_snapshot": "...",
+  "reuse_inventory": { "common_modules": [...], "shared_utilities": [...], "test_fixtures": [...], "dependencies": [...] }
+}
+```
 
 ### 20.4 무효화 조건
 
 - `git HEAD` 해시 불일치
-- `cache_ttl_hours` 경과 (기본 6시간)
+- `cache_ttl_hours` 경과 (**v0.11.0+ 기본 12시간**, v0.9.2~v0.10.0 은 6시간)
 - `schema_version` 불일치 (Ensembra 버전 업그레이드 시)
 - 사용자 수동 삭제 (`rm -rf .ensembra/cache/`)
 
@@ -1446,15 +1566,16 @@ key = sha256(
 
 - 캐시 파일에 API 키·시크릿 포함 절대 금지
 - 사용자 요청 원문 미보존 (request_intent 만 기록)
-- Conductor 는 캐시 파일 저장 전 시크릿 마스킹 재확인
+- Conductor 는 캐시 파일 저장 전 시크릿 마스킹 재확인 (v0.11.0+ `gemini_client.scrub_outbound()` 와 동일 패턴 사용)
 
 ### 20.6 토글·튜닝
 
 - `deep_scan.cache_enabled: true` (기본)
-- `deep_scan.cache_ttl_hours: 6` (기본, 1~72 허용)
+- `deep_scan.cache_ttl_hours: 12` (v0.11.0+ 기본, 1~72 허용)
 - `deep_scan.cache_path: ".ensembra/cache"` (기본)
+- `deep_scan.docs_inventory_pro_off: true` (v0.11.0+ 기본) — pro tier 에서 Deep Scan 항목 10(docs inventory) 완전 off. `source-analysis`·`security-audit` preset 은 무시
 
-CI/CD 환경이나 캐시 불필요한 경우 `cache_enabled: false`. 개발 속도가 중요한 환경은 `cache_ttl_hours: 24` 로 확장 가능 (단 git commit 없이 파일 수정 시 캐시 stale 가능성 유의).
+CI/CD 환경이나 캐시 불필요한 경우 `cache_enabled: false`. git commit 없이 파일 수정 시 TTL 이 길수록 캐시 stale 가능성 커지나, 무효화 주신호는 git HEAD 이므로 commit 만 제대로 하면 안전. v0.11.0+ 기본 12h 연장은 Phase 0 HIT 율을 높여 평균 20~40% 추가 토큰 절감을 노린다.
 
 ---
 
