@@ -1382,12 +1382,17 @@ v0.9.0 에서 모든 Gemini 경유 호출은 **단일 MCP server** (`gemini-ense
 - `/ensembra:run <요청>` (preset 생략) → Stage A 가 preset·profile 자동 결정
 - `risk_routing.enabled: false` → 자동 라우팅 비활성, 사용자 명시 필수
 
-### 19.3 금지선 (v0.9.0+ 불변식)
+### 19.3 금지선 (v0.9.0+ 불변식, v0.12.1+ pro-plan lock 추가)
 
 - Kill Switch 치명 신호 감지 시 `kill_switch: off` 설정이 있어도 **배지 알림은 필수** (의미 없는 off 금지)
 - `log_risk_decisions` 가 false 여도 Kill Switch 발동 기록은 강제 보존 (감사 추적)
 - Stage A Gemini flash 호출 실패 시 Claude Code 본체의 간이 키워드 매칭으로 폴백 (라우팅 실패 금지)
 - Stage B 재평가에서 초기 점수 대비 감소(-값) 라도 자동 경로 다운그레이드 금지 (보수적 편향 유지)
+- **v0.12.1+ pro-plan 자동 승격 금지선**: 사용자 config 의 `profile: "pro-plan"` 은 **명시적 토큰 절감 의사표시**이며, 어떤 자동 경로(Stage A 추천 / Stage B `auto_upgrade_threshold` / Auto-Escalation)도 이를 `max-plan` 으로 승격시킬 수 없다. max-plan 진입은 오직 다음 3가지 경로로만 가능:
+  1. 사용자가 `/ensembra:run <preset> --profile=max-plan <요청>` 명시
+  2. 사용자가 `/ensembra:config → Profile → max-plan` 으로 영구 변경
+  3. Kill Switch 치명 신호 발동 + 사용자 **명시 승인 프롬프트 y** (승인 없으면 중단, 자동 진행 금지)
+- 이 불변식은 `risk_routing.mode` (`always_ask`/`staged`/`aggressive`) 설정과 무관하게 강제된다. 즉 `aggressive` 모드라도 pro-plan 에서 max-plan 으로 자동 전환은 불가.
 
 ### 19.4 로깅 스키마
 
@@ -1401,12 +1406,18 @@ v0.9.0 에서 모든 Gemini 경유 호출은 **단일 MCP server** (`gemini-ense
     "intent": "...",
     "initial_risk_score": 0,
     "confidence": 0.0,
-    "reasoning": "한 문장"
+    "reasoning": "한 문장",
+    "suggested_profile": "pro-plan|max-plan|null"
   },
   "stage_b": {
     "refined_risk_score": 0,
     "signals": [ { "type": "...", "weight": 0 } ],
     "kill_switch": false
+  },
+  "pro_plan_lock": {
+    "active": true,
+    "suppressed_suggestions": ["profile:max-plan"],
+    "user_config_profile": "pro-plan"
   },
   "final_preset": "...",
   "final_profile": "...",
@@ -1415,7 +1426,7 @@ v0.9.0 에서 모든 Gemini 경유 호출은 **단일 MCP server** (`gemini-ense
 }
 ```
 
-`request_hash` 로 원문 미보존 (개인정보·시크릿 유출 방지).
+`request_hash` 로 원문 미보존 (개인정보·시크릿 유출 방지). v0.12.1+ `pro_plan_lock` 필드 신설 — lock 발동 시 어떤 자동 승격 제안이 억제되었는지 추적 (감사 + 사용자 통계 용도).
 
 ### 19.5 Pre-flight Bailout (v0.9.2+)
 
@@ -1571,12 +1582,27 @@ Phase 0 Deep Scan 산출물로 **추가 tool call 없이** 재평가. 가중치 
 
 **`mode: aggressive`**: 변동 ≥ `notify_threshold` → 자동 업그레이드 (묻지 않음). Kill Switch: 별도 레이어.
 
-#### 업그레이드 경로 매핑
+#### 업그레이드 경로 매핑 (preset 차원만)
 
 - `ops` + pro-plan → `ops-safe` + pro-plan
 - `ops-safe` + pro-plan → `feature` + pro-plan
-- `feature` + pro-plan → `feature` + max-plan
+- `feature` + pro-plan → `feature` + pro-plan (💡 **profile 승격 없음** — pro-plan lock, §19.3)
 - `feature` + max-plan → `feature` + max-plan + 강제 전문 감사 전원 (최고 경로)
+
+#### pro-plan lock 상세 적용 규칙 (v0.12.1+)
+
+사용자 config 의 `profile` 값에 따라 자동 업그레이드가 실제로 다르게 동작한다:
+
+| 설정 profile | Stage A 추천 | Stage B 자동 업그레이드 | Auto-Escalation (R2) | Kill Switch |
+|---|---|---|---|---|
+| **`pro-plan`** | preset 만 조정 제안 (profile 유지) | preset 만 승격 (profile 유지) | R2 R2 전체 전달 수락 가능 (profile 변경 아님) | 중단 + 승인 프롬프트. **승인 없으면 중단 유지, max 자동 진입 금지** |
+| **`max-plan`** | preset + profile 양쪽 조정 가능 | preset + 필요 시 profile 유지·심화 경로 | R2 항상 전체 전달 (max tier 기본 동작) | 중단 + 승인 프롬프트. 승인 시 최고 경로 진입 |
+| **`custom`** | `profile_overrides` 내용에 따라 pro-plan/max-plan 중 가까운 쪽 규칙 적용 (보수 판정) | 동상 | 동상 | 동상 |
+
+**구현 원칙**:
+- Conductor 는 Stage A 응답을 받은 직후 **사용자 config `profile` 확인**. `pro-plan` 이면 Stage A/B 의 "profile 승격" 필드를 무시하고 preset 만 수용
+- 승격 배지 출력 시 pro-plan lock 발동 표시: `🔒 pro-plan lock (profile 승격 차단, preset 만 조정)`
+- 사용자가 정말 max 진입을 원하면 **명시적 경로** 3가지만 가능: `--profile=max-plan` 인자, config 영구 변경, Kill Switch 명시 승인
 
 ---
 

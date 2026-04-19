@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.1] — 2026-04-19 (pro-plan 자동 승격 금지선 불변식)
+
+### Added — pro-plan Lock 불변식 (CONTRACT §19.3 / §19.9)
+
+**문제 인식**: v0.12.0 까지 `risk_routing.mode: staged` (기본) 에서 `auto_upgrade_threshold ≥ 10` 도달 시 Conductor 가 `pro-plan → max-plan` 으로 **자동 승격** 가능. 사용자가 pro-plan 을 선택한 의도는 "토큰 절감 명시 의사표시" 인데, 이 원칙이 문서화되지 않아 Stage A 추천·Stage B 자동 업그레이드가 사용자 의도를 무시할 수 있는 설계 공백이었음.
+
+- `CONTRACT.md §19.3` 에 pro-plan lock 불변식 명시 — "profile='pro-plan' 은 어떤 자동 경로(Stage A 추천 / Stage B auto_upgrade / Auto-Escalation)도 max-plan 으로 승격 불가. `risk_routing.mode` 와 무관하게 강제".
+- max-plan 진입은 **오직 3가지 명시 경로**로만 가능:
+  1. `/ensembra:run <preset> --profile=max-plan <요청>` 인자
+  2. `/ensembra:config → Profile → max-plan` 영구 변경
+  3. Kill Switch 치명 신호 + 사용자 **명시 승인 y** (승인 없으면 중단)
+
+### Changed — §19.9 업그레이드 경로 매핑 pro-plan lock 반영
+
+- `feature + pro-plan → feature + max-plan` 경로를 **`feature + pro-plan → feature + pro-plan` (profile 승격 없음)** 으로 변경.
+- lock 상세 적용 규칙 표 신설 (profile 별 Stage A/B/Auto-Escalation/Kill Switch 동작 차이).
+- `aggressive` 모드도 pro-plan 은 lock 됨을 명시.
+
+### Changed — §19.4 로깅 스키마 `pro_plan_lock` 필드 신설
+
+- `.claude/ensembra/reports/risk/runs.jsonl` 스키마에 `pro_plan_lock` 객체 추가 (active/suppressed_suggestions/user_config_profile).
+- Stage A 의 `suggested_profile` 필드도 추가해 lock 에 의해 억제된 원래 추천 값 추적.
+- 용도: 감사 추적 + 사용자 통계 (lock 발동 빈도로 설계 원칙 유효성 검증).
+
+### Changed — `skills/run/SKILL.md` Stage A 섹션
+
+- pro-plan Lock 전용 서브섹션 신설 — 활성 조건·동작·배지 포맷 (`🔒 pro-plan lock`)·명시 경로 3종.
+- Stage A 흐름 프롬프트 설명에 lock 활성 시 `[3] 직접지정` 으로만 max-plan 진입 가능함을 명시.
+
+### Changed — `schemas/config.json` `risk_routing` description
+
+- 최상위 `risk_routing` description 에 pro-plan lock 불변식 요약 추가.
+- `mode` 필드 description 에 "aggressive 도 pro-plan lock 됨" 명시.
+- `auto_upgrade_threshold` 필드 description 에 pro-plan 에서의 실제 동작 (preset 만 승격) 명시.
+
+### Design Rationale
+
+- **사용자 명시 의사 존중**: pro-plan 선택은 토큰 예산 제약의 명시적 선언. 자동 승격은 이를 무시하는 것.
+- **회귀 위험 0**: 기존 `pro-plan → max-plan` 자동 승격은 v0.12.0 까지 발동 사례 없음 (레포 records 기반). 이 불변식 추가는 **잠재적 미래 회귀 방지** 성격.
+- **사용자 오버라이드 유지**: 정말 max 가 필요하면 3가지 명시 경로로 진입 가능 — 토글/제어권은 사용자에게 남김.
+
+### Migration (v0.12.0 → v0.12.1)
+
+- 사용자 작업 **불필요** — 기본 동작 변경이며 기존 config 그대로 동작.
+- `risk_routing.mode: aggressive` 사용자도 pro-plan 이면 자동으로 lock 적용.
+- max-plan 사용자는 기존과 동일 (lock 미적용).
+
 ## [0.12.0] — 2026-04-19 (Artifact Offload 스펙 + Transport Context Window 상한 + 캐시 경로 .claude/ 이관)
 
 ### Added — `_error.code: "token_limit"` 표준 분기 (CONTRACT §5.1/§5.2)

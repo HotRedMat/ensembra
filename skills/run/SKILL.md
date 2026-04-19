@@ -81,12 +81,29 @@ pro 로 실행 중 R1 합의율 40~70% 구간 진입 시 Conductor 는 사용자
 
 Gemini 호출은 MCP tool `triage_request` 사용. 실패 시 Claude 본체 키워드 스코어링 폴백 (정확도 낮음, §19.3 불변식).
 
+### pro-plan Lock (v0.12.1+)
+
+사용자 config `profile: "pro-plan"` 은 **명시적 토큰 절감 의사표시**. Conductor 는 Stage A 응답 수신 직후 config 확인하여 다음 동작을 강제:
+
+- Stage A 가 `profile: max-plan` 추천해도 **무시** (preset 만 수용)
+- Stage B (Phase 0.5) 에서 `auto_upgrade_threshold` 초과해도 **profile 승격 차단**, preset 만 업그레이드 경로 매핑 (§19.9) 따름
+- Auto-Escalation (R1 합의율 40~70%) 은 R2 전체 전달 수락은 가능하나 **profile 변경 아님** — 사용자 본 실행 한정 합의
+- 배지 출력: `🔒 pro-plan lock (profile 승격 차단, preset 만 조정: ops→ops-safe 등)`
+
+**max-plan 진입은 오직 3가지 경로**:
+1. `/ensembra:run <preset> --profile=max-plan <요청>` 명시
+2. `/ensembra:config → Profile → max-plan` 영구 변경
+3. Kill Switch 치명 신호 + 사용자 **명시 승인 y** (승인 없으면 중단, 자동 진행 금지)
+
+이 원칙은 `risk_routing.mode` (`always_ask`/`staged`/`aggressive`) 와 무관하게 강제된다. 상세: CONTRACT.md §19.3, §19.9.
+
 ### Stage A 흐름
 
 - Bailout 판정 `false` → 안내 + `auto_bailout` 여부에 따라 자동 종료 또는 사용자 `[1]종료/[2]강행` 프롬프트
 - `ensembra_needed: true` → 점수·confidence 표시 + 초기 경로 제안. `mode == always_ask` 또는 점수 ≥10 에서만 사용자 프롬프트 (`[1]권장 [2]낮추기 [3]직접지정 [4]Ensembra 생략 [5]취소`)
 - `mode == staged` 이고 점수 <10 → 조용히 진행 (배지만)
-- `log_risk_decisions: true` → `.claude/ensembra/reports/risk/runs.jsonl` 기록 (v0.11.0+ 기본, 스키마 CONTRACT.md §19.4)
+- **pro-plan lock 활성 시** 프롬프트 `[1] 권장` 옵션은 profile 승격 제외하고 preset 만 조정. `[3] 직접지정` 에서 사용자가 명시적으로 `max-plan` 선택하면 허용 (명시 경로)
+- `log_risk_decisions: true` → `.claude/ensembra/reports/risk/runs.jsonl` 기록. pro-plan lock 발동 건은 `locked: true` 필드로 구분 기록 (CONTRACT.md §19.4)
 
 상세 프롬프트 템플릿·점수표·사용자 확인 조건: CONTRACT.md §19.6.
 
