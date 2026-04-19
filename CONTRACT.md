@@ -169,6 +169,33 @@ Performer 가 매 턴 반환하는 JSON.
 - `abstain` 은 에러가 아니다. 해당 Performer 가 의견 없음을 명시한 것으로 간주한다.
 - 타임아웃은 Conductor 가 Performer 별로 별도 관리. 타임아웃 초과 시 `_error.code = "timeout"`.
 
+### 5.1 `_error.code` 표준 분기 (v0.12.0+)
+
+Performer 실패 사유는 아래 코드 중 하나로 정규화한다. Conductor 는 코드별로 다른 회복 전략을 적용한다.
+
+| 코드 | 의미 | Conductor 동작 |
+|---|---|---|
+| `timeout` | Performer 실행이 `timeout_sec` 초과 | 해당 Performer 만 error, 라운드 계속 |
+| `format` | 출력 파싱 실패 (`===ENSEMBRA-OUTPUT===` 블록 미도달, JSON invalid) | 1회 재시도, 실패 시 error |
+| `schema` | 출력 스키마 위반 (필수 필드 누락 등) | 1회 재시도, 실패 시 error |
+| `transport-chain-exhausted` | §8.8 3단 체인 전부 실패 | 해당 Performer 만 error, 라운드 계속 |
+| **`token_limit`** | **입력·출력이 transport 의 context window(§8.10) 초과로 잘림** | **Conductor 즉시 라운드 중단 판정. `artifact_offload.enabled=true` 면 자동 재시도(요약 전달). false 면 사용자 프롬프트로 escalate.** |
+| `rate_limit` | 외부 LLM HTTP 429 (quota/throttle) | `fallback.retry_delay_sec` 대기 후 체인 다음 단계로 폴백 |
+| `unauthorized` | 인증 실패 (401) | 체인 다음 단계로 폴백, 키 문제는 사용자에게 배지 경고 |
+
+**`token_limit` 분기 신설 배경 (v0.12.0+)**: 이전 구현은 응답 절단을 `format` 으로 흡수해 silent fail 우려 있었음. final-auditor 같은 opus 서브에이전트에서 200K 초과 입력을 받으면 응답이 잘려 `===END===` 미도달 → Conductor 가 "포맷 오류" 로 오인. 전용 코드 분기로 **원인 가시성 확보 + `artifact_offload` 기반 자동 요약 재전송** 경로를 제공한다.
+
+### 5.2 `token_limit` 탐지 휴리스틱
+
+Conductor 는 다음 신호를 `token_limit` 로 판정:
+
+1. 응답이 `===ENSEMBRA-OUTPUT===` 로 시작했으나 `===END===` 미도달 (절단 의심)
+2. 입력 바이트 크기가 transport 의 `max_input_chars` (§8.11) 초과
+3. 외부 LLM 응답 본문에 `"context length"`, `"token limit"`, `"too long"` 등 오류 메시지 포함
+4. 서브에이전트 응답 길이가 0 + 별도 에러 없음 (컨텍스트 초과로 LLM 이 조용히 실패한 경우)
+
+2번은 **사전 탐지** (호출 전 차단) 가능. 1·3·4 는 **사후 탐지** (응답 수신 후 판정).
+
 ---
 
 ## 6. 종료 조건
@@ -732,6 +759,46 @@ v0.7.0 의 architect 전용 3단 체인은 v0.8.0 에서 다음 선언과 의미
 ```
 
 즉 v0.7.x 사용자의 동작은 설정 마이그레이션 없이도 그대로 유지된다. `agents/architect.md` 의 Transport 섹션은 위 선언의 의미를 그대로 서술하는 것이고, 코드 경로는 §8.8 공통 루프에 흡수되었다.
+
+### 8.11 Transport Context Window 상한표 (v0.12.0+)
+
+각 Transport 는 고유한 context window 를 가진다. `max tier` 의 "무제한" 선언(§17)은 **Conductor(본 세션) 관점의 비압축 선언**일 뿐, 실제 Performer 전송 시 Transport 수용량에 맞춰 Conductor 가 자동 압축·요약·파일 참조로 변환해야 한다. 본 절이 그 기준값이다.
+
+| Transport | Model | Context Window | `max_input_chars` (안전선, 80%) |
+|---|---|---|---|
+| MCP (`gemini-ensembra`) | `gemini-2.5-pro` | 1,000,000 토큰 (≈ 4,000,000 chars) | 3,200,000 |
+| MCP (`gemini-ensembra`) | `gemini-2.5-flash` | 1,000,000 토큰 | 3,200,000 |
+| MCP (`gemini-ensembra`) | `gemini-2.5-flash-lite` | 1,000,000 토큰 | 3,200,000 |
+| Ollama | `qwen2.5:14b` (기본) | 32,768 토큰 (≈ 131,072 chars) | 104,857 |
+| Ollama | `qwen2.5-coder:14b` | 32,768 토큰 | 104,857 |
+| Ollama | `gpt-oss:20b` | 128,000 토큰 (≈ 512,000 chars) | 409,600 |
+| Ollama | 기타 (보수 가정) | 32,768 토큰 | 104,857 |
+| Claude subagent | `haiku` | 200,000 토큰 (≈ 800,000 chars) | 640,000 |
+| Claude subagent | `sonnet` | 200,000 토큰 | 640,000 |
+| Claude subagent | `opus` | 200,000 토큰 | 640,000 |
+| Claude subagent | `opus` + 1M 확장 | 1,000,000 토큰 | **세션 한정, 서브에이전트엔 전파 안 됨** |
+
+**핵심 불변식**:
+
+1. **Claude 서브에이전트 1M 확장은 본 세션 한정**. `agents/*.md` 의 `model: opus` 는 기본적으로 200K context 로 호출된다.
+2. **Ollama context window 는 모델별 Modelfile 에 선언된 `num_ctx` 가 상한**. 본 표는 기본값 가정이며 사용자가 Modelfile 수정 시 실제 상한이 달라질 수 있다.
+3. Conductor 는 Performer 호출 **직전** 입력 크기를 측정해 `max_input_chars` 초과 시 다음 중 하나 수행:
+   - `artifact_offload.enabled=true` 면 자동 요약 + 파일 경로 참조 (§21)
+   - 기본값(off) 면 `_error.code: "token_limit"` 으로 사전 차단 + 사용자 알림
+4. 체인 폴백 시 각 단계의 `max_input_chars` 가 다르므로 **같은 입력이 MCP 에선 성공, Claude subagent 에선 실패** 가능. Conductor 는 폴백 경로 전환 시 입력 재검증 필수.
+5. §17 max tier 의 "scribe 무제한" · "R2 prior_outputs 전체 전달" 선언은 본 표의 Transport 상한에 의해 **실질 제약**된다. 선언은 Conductor 의 의도이고, 실행은 Transport 수용량에 종속된다.
+
+**배지 연동**: Conductor 는 Performer 호출 시 입력 크기 ≥ `max_input_chars × 0.8` 도달 시 배지 `⚠ Context 접근 (Performer, bytes/limit)` 출력. ≥ 1.0 도달 시 즉시 `token_limit` 분기 (§5.1).
+
+### 8.12 max tier "무제한" 선언의 실질 정의 (v0.12.0+)
+
+§17 의 `scribe_max_chars_per_phase: -1`, R2 `prior_outputs` 전체 전달 등 "무제한" 선언은 다음과 같이 읽어야 한다:
+
+- **Conductor 는 의도적 압축·절단을 수행하지 않는다**
+- **Performer 전송 직전, §8.11 상한 내에서 Transport 별 자동 요약·파일 참조 변환은 허용·필수**
+- **본 세션 컨텍스트 유지 측면에선 제한 없음** (1M 한도 내에서 원본 유지)
+
+즉 "무제한" 은 **Conductor 의지에 의한 압축 금지**이지 **수신 측 수용량 무시**가 아니다. 이 정의는 §17 Tier 매트릭스와 §21 Artifact Offload 의 전제다.
 
 ## 9. Work Phases (5단 파이프라인)
 
@@ -1538,8 +1605,10 @@ key = sha256(
 
 ### 20.3 캐시 파일 경로·포맷
 
-- 경로: `{deep_scan.cache_path}/phase0-{key}.json` (기본 `.ensembra/cache/phase0-{key}.json`)
-- `.gitignore` 에 `.ensembra/cache/` 추가 (v0.9.2 기본값)
+- 경로: `{deep_scan.cache_path}/phase0-{key}.json` (v0.12.0+ 기본 `.claude/ensembra/cache/phase0-{key}.json`)
+- v0.12.0+ 기본 경로 이관: `.ensembra/cache/` → `.claude/ensembra/cache/`. 플러그인 산출물을 대상 프로젝트의 `.claude/` 하위에 격리해 프로젝트 자체 산출물과 충돌 방지
+- **하위 호환**: 구 경로 `.ensembra/cache/` 에 캐시가 이미 있는 환경에서는 Conductor 가 Read 로 HIT 허용 (fallback). 신규 저장은 항상 새 경로. v0.13 에서 구 경로 지원 제거 예정
+- `.gitignore` 에 `.claude/ensembra/cache/` 추가 (v0.12.0+ 기본값). 기존 `.ensembra/cache/` 엔트리도 당분간 유지
 - 파일 스키마:
 
 ```json
@@ -1560,7 +1629,7 @@ key = sha256(
 - `git HEAD` 해시 불일치
 - `cache_ttl_hours` 경과 (**v0.11.0+ 기본 12시간**, v0.9.2~v0.10.0 은 6시간)
 - `schema_version` 불일치 (Ensembra 버전 업그레이드 시)
-- 사용자 수동 삭제 (`rm -rf .ensembra/cache/`)
+- 사용자 수동 삭제 (`rm -rf .claude/ensembra/cache/`)
 
 ### 20.5 보안 불변식
 
@@ -1572,10 +1641,109 @@ key = sha256(
 
 - `deep_scan.cache_enabled: true` (기본)
 - `deep_scan.cache_ttl_hours: 12` (v0.11.0+ 기본, 1~72 허용)
-- `deep_scan.cache_path: ".ensembra/cache"` (기본)
+- `deep_scan.cache_path: ".claude/ensembra/cache"` (v0.12.0+ 기본, 이전 `.ensembra/cache` 는 fallback Read 만 지원)
 - `deep_scan.docs_inventory_pro_off: true` (v0.11.0+ 기본) — pro tier 에서 Deep Scan 항목 10(docs inventory) 완전 off. `source-analysis`·`security-audit` preset 은 무시
 
 CI/CD 환경이나 캐시 불필요한 경우 `cache_enabled: false`. git commit 없이 파일 수정 시 TTL 이 길수록 캐시 stale 가능성 커지나, 무효화 주신호는 git HEAD 이므로 commit 만 제대로 하면 안전. v0.11.0+ 기본 12h 연장은 Phase 0 HIT 율을 높여 평균 20~40% 추가 토큰 절감을 노린다.
+
+---
+
+## 21. Artifact Offload (v0.12.0+ 스펙, opt-in)
+
+Phase 1 Performer 출력·Phase 3 감사 출력을 파일로 오프로드해 본 세션 컨텍스트 누적과 Transport context window 오버플로우(§8.11) 리스크를 완화하는 opt-in 장치. 기본값은 비활성(`artifact_offload.enabled: false`), 실측 200K 근접/초과 사례 축적 후 활성화 권장.
+
+### 21.1 설계 원칙
+
+- **Performer 는 파일 직접 쓰지 않는다**. Conductor 가 Performer 응답 수신 직후 `artifact_offload.path/{run_id}/` 에 저장 (§9 Performer Write 금지선 준수)
+- **본 세션 컨텍스트엔 요약 + 경로**만 유지 (`artifact_offload.summary_chars`, 기본 300자)
+- **후속 Performer 에게 전달 시** §8.11 `max_input_chars` 내에서 Conductor 가 요약 or `@{artifact_path}` 참조 경로 전달 방식 선택
+- **`artifact_offload.enabled: false` 시 동작 무변경**. 기존 v0.11.x 파이프라인과 완전 동일 (회귀 없음)
+
+### 21.2 디렉토리 구조
+
+```
+{artifact_offload.path}/                        # 기본 .claude/ensembra/artifacts/
+├── {run_id}/                                   # UUID v4 + ISO8601 prefix (동시 실행 충돌 방지)
+│   ├── manifest.json                           # 아래 §21.3 스키마
+│   ├── phase1-r1-architect.md
+│   ├── phase1-r1-developer.md
+│   ├── phase1-r1-devils-advocate.md
+│   ├── phase1-r1-qa.md
+│   ├── phase1-r2-{role}.md                     # R2 수행 시만
+│   ├── phase1-synthesis.md
+│   ├── phase3-audit-architect.md
+│   ├── phase3-audit-devils-advocate.md
+│   └── phase3-final-auditor.md
+```
+
+### 21.3 `manifest.json` 스키마
+
+```json
+{
+  "schema_version": "0.12.0",
+  "run_id": "20260419T133042-a3f9",
+  "started_at": "ISO8601",
+  "preset": "refactor",
+  "plan_tier": "pro|max",
+  "profile": "pro-plan|max-plan|custom",
+  "artifacts": [
+    {
+      "phase": "phase1-r1|phase1-r2|phase1-synthesis|phase3-audit|phase3-final-auditor",
+      "role": "architect|developer|...",
+      "file": "phase1-r1-architect.md",
+      "bytes": 4281,
+      "created_at": "ISO8601",
+      "summary_chars_used": 287,
+      "transport_used": "mcp|ollama|claude-subagent",
+      "model_used": "gemini-2.5-flash|qwen2.5:14b|sonnet|..."
+    }
+  ]
+}
+```
+
+### 21.4 run_id 생성 규칙 (동시 실행 충돌 방지)
+
+`run_id = "{ISO8601 compact}-{uuid4 first 4 hex}"` (예: `20260419T133042-a3f9`).
+- ISO8601 compact = `%Y%m%dT%H%M%S`
+- uuid4 first 4 hex = 충돌 확률 1/65536. 동일 초 내 >2 실행 시 안전
+- 극단적 경우 (대량 병렬) 는 uuid4 full 8 hex 로 확장 가능 (config 향후 필드)
+
+### 21.5 retention 정책
+
+- `artifact_offload.retention_days` (기본 7) 경과한 `{run_id}/` 디렉토리는 다음 Ensembra 실행 Phase 0 직전에 Conductor 가 일괄 정리
+- git HEAD 기반 자동 정리는 하지 않음 (Phase 0 캐시와 달리 run_id 는 사후 감사·디버깅 목적이라 git 이력과 독립)
+- 사용자 수동 삭제: `rm -rf .claude/ensembra/artifacts/` 안전
+
+### 21.6 보안 불변식
+
+- artifact 파일에 API 키·시크릿 포함 금지. 저장 직전 Conductor 가 `gemini_client.scrub_outbound()` 동일 패턴으로 마스킹 검증
+- Performer 가 artifact 경로에 직접 쓰기 권한 없음 (Performer Read 도 허용하지 않음. 필요 시 Conductor 가 Read 하고 본문을 `prior_outputs` 로 전달)
+- `.gitignore` 에 `.claude/ensembra/artifacts/` 자동 포함 (`.claude/ensembra/` 전체 이미 무시)
+
+### 21.7 Transport 별 전달 전략
+
+Conductor 가 후속 Performer 호출 시 artifact 를 어떻게 전달할지 결정하는 규칙:
+
+| 후속 Transport | 입력 크기 판정 | 전달 방식 |
+|---|---|---|
+| MCP Gemini (1M) | artifact 전체 < 3.2M chars | **원본 인라인** 전달 |
+| Claude subagent 200K | artifact 전체 < 640K chars | 원본 인라인 전달 |
+| Claude subagent 200K | 그 이상 | **요약(300~1000자) + 경로 인용** 전달 (`@.claude/ensembra/artifacts/{run_id}/phase1-r1-architect.md`). Performer 프롬프트에 "필요 시 Read tool 로 원본 조회 가능" 명시 |
+| Ollama 32K | artifact 전체 < 104K chars | 원본 인라인 |
+| Ollama 32K | 그 이상 | 요약만 (Ollama 는 Read tool 없음, 원본 접근 불가) |
+
+### 21.8 호환성 및 롤아웃
+
+- **v0.12.0 도입, 기본 off**: 기존 v0.11.x 동작 완전 보존
+- **v0.12.x 수집 기간**: 사용자 opt-in 으로 활성화한 환경에서 `manifest.json` 의 `bytes` 필드 분포 수집
+- **v0.13 이후 기본 on 검토**: 200K 근접 사례 ≥10% 확인 시 기본값 변경. 이때 `artifact_offload.enabled: true` 를 SKILL.md 기본으로 이동
+
+### 21.9 CONTRACT 관련 참조
+
+- §5.1 `token_limit` 에러 코드: artifact 오프로드가 enabled 일 때 자동 요약 재전송 경로 제공
+- §8.11 Transport Context Window 상한표: artifact 전달 방식 판정 기준
+- §8.12 max tier "무제한" 실질 정의: artifact 오프로드가 max 의 "무제한" 을 실제로 뒷받침하는 구현 기반
+- §20 Phase 0 Cache: 구조·보안·retention 원칙을 재사용 (신규 추상화 없음, §16 Reuse-First 준수)
 
 ---
 

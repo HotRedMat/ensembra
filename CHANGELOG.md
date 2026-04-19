@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] — 2026-04-19 (Artifact Offload 스펙 + Transport Context Window 상한 + 캐시 경로 .claude/ 이관)
+
+### Added — `_error.code: "token_limit"` 표준 분기 (CONTRACT §5.1/§5.2)
+
+**문제 인식**: 이전 구현은 응답 절단을 `_error.code: "format"` 으로 흡수. final-auditor (opus 서브에이전트 200K) 가 긴 Phase 0~3 기록을 받을 때 응답이 잘려도 Conductor 가 "포맷 오류" 로 오인하는 silent fail 잠복 회귀.
+
+- `CONTRACT.md §5.1` 에 `_error.code` 표준 분기표 7종 신설 (timeout / format / schema / transport-chain-exhausted / **token_limit** / rate_limit / unauthorized).
+- `§5.2` 에 token_limit 탐지 휴리스틱 4종 (사전 1건: 입력 크기 사전 측정, 사후 3건: `===END===` 미도달·응답 에러 키워드·길이 0).
+- Conductor 는 `token_limit` 발생 시 `artifact_offload.enabled=true` 면 자동 요약 재전송, false 면 사용자 프롬프트로 escalate.
+
+### Added — Transport Context Window 상한표 (CONTRACT §8.11/§8.12)
+
+**문제 인식**: max tier 의 `scribe_max_chars_per_phase: -1` · R2 `prior_outputs` 전체 전달 등 "무제한" 선언은 Conductor(본 세션 1M) 관점일 뿐. 실제 Performer 전송 시 Transport 수용량 (MCP Gemini 1M / Ollama 32~128K / Claude subagent 200K) 에 막힘. Claude subagent 1M 확장은 세션 한정, 서브에이전트엔 전파되지 않음.
+
+- `§8.11` Transport 별 `max_input_chars` 상한 테이블 (각 모델별 80% 안전선).
+- 핵심 불변식 5건: Claude subagent 1M 확장 비전파 / Ollama num_ctx 상한 / 호출 직전 입력 크기 측정 / 폴백 전환 시 재검증 / max tier "무제한" 의 실질 제약.
+- 배지 연동: 입력 크기 ≥ 80% 도달 시 `⚠ Context 접근` 배지, 100% 도달 시 token_limit 분기.
+- `§8.12` max tier "무제한" 실질 정의 — Conductor 비압축 선언이지 수신 측 수용량 무시가 아님.
+
+### Added — Artifact Offload 스펙 (CONTRACT §21, opt-in 기본 off)
+
+**문제 인식**: Phase 1 Performer 출력 · Phase 3 감사 출력이 본 세션 컨텍스트에 직접 누적. 1M 세션에선 견디지만 서브에이전트 200K 엔 오버플로우 리스크. 기존 Phase 0 캐시(§20) 만 파일화되어 있음.
+
+- `schemas/config.json` 에 `artifact_offload` 블록 신설 (enabled/path/summary_chars/retention_days/context_handoff_mode 5속성).
+- `CONTRACT.md §21` 전체 신설 — 9개 서브섹션 (원칙/구조/manifest 스키마/run_id 규칙/retention/보안/Transport 별 전달 전략/롤아웃/참조).
+- 기본값 `enabled: false` — 실측 200K 근접 사례 축적까지 opt-in. v0.13 이후 기본 on 검토.
+- Performer Write 금지선 (§11.3) 유지: Conductor 가 저장 중개, Performer 는 필요 시 Read 로 재로딩.
+- `run_id` 는 ISO8601 compact + uuid4 first 4 hex 조합으로 동시 실행 경로 충돌 방지.
+- `skills/run/SKILL.md` 에 Artifact Offload 훅 규약 섹션 추가.
+
+### Changed — Phase 0 캐시 경로 `.claude/ensembra/cache/` 이관
+
+**문제 인식**: 기존 `.ensembra/cache/` (프로젝트 루트 직속) 는 v0.11.0 의 "플러그인 산출물 `.claude/` 격리" 원칙과 불일치. Phase 0 캐시만 이 원칙에서 벗어나 있었음.
+
+- `schemas/config.json` `deep_scan.cache_path` 기본값: `.ensembra/cache` → `.claude/ensembra/cache`.
+- **하위 호환**: 구 경로에 기존 캐시가 있으면 Conductor 가 Read fallback 으로 HIT 허용. 신규 저장은 항상 새 경로. v0.13 에서 구 경로 지원 제거 예정.
+- `CONTRACT.md §20.3/§20.4/§20.6` 및 `skills/run/SKILL.md` 경로 문구 갱신.
+- `.gitignore`: 신규 경로는 `.claude/ensembra/` 전체 무시 라인에 자연 포함. 구 `.ensembra/cache/` 엔트리는 fallback 환경 지원용으로 당분간 유지.
+
+### Security
+
+- `artifact_offload` 파일 저장 직전 `gemini_client.scrub_outbound()` 동일 패턴으로 시크릿 마스킹 검증 (§21.6).
+- Performer 는 artifact 경로 Write·Read 권한 없음 — Conductor 가 중개.
+
+### Design Rationale
+
+- **Reuse-First**: Phase 0 캐시 패턴(§20)을 `.claude/ensembra/cache/` 이관 + §21 Artifact Offload 로 그대로 확장. 신규 추상화 0건.
+- **실측 게이트**: devils-advocate 가 R1 에서 "실측 없이 가지 말라" 게이트 제시. Stage 0 측정 결과 현 레포지토리 기록상 200K 초과 사례 0건 확인 → Conductor runtime 구현은 보류, 문서·스키마 레벨 (token_limit 분기·Transport 상한표·artifact_offload 스키마 opt-in) 만 선행 도입.
+- **회귀 위험 0**: `artifact_offload.enabled: false` 기본값으로 기존 v0.11.x 파이프라인 동작 완전 보존. opt-in 활성화 시에만 신규 경로 작동.
+
+### Migration (v0.11 → v0.12)
+
+- 사용자 작업 **불필요** — 모든 변경은 기본값 유지로 기존 동작 보존.
+- `artifact_offload` 사용을 원하면 `/ensembra:config` 또는 `~/.config/ensembra/config.json` 에 `"artifact_offload": { "enabled": true }` 추가.
+- 구 `.ensembra/cache/` 디렉토리는 삭제해도 무방 (git commit 직후 Phase 0 HIT 재생성). 유지해도 fallback Read 로 동작.
+
 ## [0.11.0] — 2026-04-19 (토큰 비용 추가 절감 + 플러그인 출력 격리)
 
 ### Changed — SKILL.md slim (56% 축소) · CONTRACT.md 정본 승격

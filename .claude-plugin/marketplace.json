@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "Ensembra — multi-agent orchestrator plugin for Claude Code. This marketplace hosts the Ensembra plugin from the same repository.",
-    "version": "0.11.0"
+    "version": "0.12.0"
   },
   "plugins": [
     {
       "name": "ensembra",
       "source": "./",
       "description": "Six specialist agents + scribe in a 5-phase pipeline (Gather/Deliberate/Execute/Audit/Document) with Reuse-First cross-cutting policy. MCP-based Gemini architect. Built for solo developers.",
-      "version": "0.11.0",
+      "version": "0.12.0",
       "author": {
         "name": "Seungho Lee",
         "email": "misstal80@gmail.com"

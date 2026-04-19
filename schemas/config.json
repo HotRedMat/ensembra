@@ -165,7 +165,7 @@
         "cache_enabled": {
           "type": "boolean",
           "default": true,
-          "description": "v0.9.2+. Phase 0 Deep Scan 결과를 .ensembra/cache/ 에 저장해 같은 프로젝트·같은 요청 해시 반복 실행 시 재사용. git HEAD 해시 변경 시 자동 무효화. CONTRACT.md §20 참조."
+          "description": "v0.9.2+. Phase 0 Deep Scan 결과를 .claude/ensembra/cache/ 에 저장해 같은 프로젝트·같은 요청 해시 반복 실행 시 재사용. git HEAD 해시 변경 시 자동 무효화. CONTRACT.md §20 참조. v0.12.0+ 기본 경로 .ensembra/cache → .claude/ensembra/cache 로 이관 (플러그인 산출물 .claude/ 격리 원칙)."
         },
         "cache_ttl_hours": {
           "type": "integer",
@@ -181,8 +181,44 @@
         },
         "cache_path": {
           "type": "string",
-          "default": ".ensembra/cache",
-          "description": "v0.9.2+. Deep Scan 캐시 저장 디렉토리. 프로젝트 루트 기준 상대 경로. .gitignore 에 추가 권장."
+          "default": ".claude/ensembra/cache",
+          "description": "v0.9.2+. Deep Scan 캐시 저장 디렉토리. 프로젝트 루트 기준 상대 경로. v0.12.0+ 기본 경로 이관 (이전: .ensembra/cache). 플러그인 산출물을 대상 프로젝트의 .claude/ 하위에 격리해 프로젝트 자체 산출물과 충돌 방지. 사용자가 명시적으로 '.ensembra/cache' 로 설정한 경우 Conductor 가 그 경로도 Read 로 호환 지원 (deprecated, v0.13 제거 예정)."
+        }
+      }
+    },
+    "artifact_offload": {
+      "type": "object",
+      "description": "v0.12.0+ (opt-in, 기본 비활성). Phase 1 Performer 출력·Phase 3 감사 출력을 파일로 오프로드해 본 세션 컨텍스트 누적과 서브에이전트 200K context 오버플로우 리스크를 완화. Conductor 가 저장 중개(Performer Write 금지선 유지). 본 세션엔 경로 참조 + 요약만 남기고 필요 시 Read 로 재로딩. 상세 규약 및 파일 포맷은 CONTRACT.md §21 (v0.12.0+) 참조.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "v0.12.0+. artifact 오프로드 활성화. 기본 false — 실측 200K 근접/초과 사례가 축적될 때까지 opt-in. 활성화 시 Conductor 는 Phase 1 R1/R2 출력, Phase 3 전문 감사자·final-auditor 출력을 파일로 저장 후 본 세션엔 summary_chars 이내 요약 + 경로만 유지."
+        },
+        "path": {
+          "type": "string",
+          "default": ".claude/ensembra/artifacts",
+          "description": "v0.12.0+. artifact 저장 루트 디렉토리. 실행별 하위 디렉토리 {run_id}/ 자동 생성 (UUID + timestamp). 플러그인 산출물 .claude/ 격리 원칙."
+        },
+        "summary_chars": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 2000,
+          "default": 300,
+          "description": "v0.12.0+. 본 세션 컨텍스트에 유지되는 artifact 요약 길이 상한. pro tier 권장 300, max tier 권장 1000."
+        },
+        "retention_days": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 90,
+          "default": 7,
+          "description": "v0.12.0+. artifact 보존 기간(일). 만료 artifact 는 다음 실행 시 Conductor 가 정리. Phase 0 캐시와 달리 run_id 단위라 사후 감사·디버깅 용도."
+        },
+        "context_handoff_mode": {
+          "type": "string",
+          "enum": ["summary_with_ref", "full"],
+          "default": "summary_with_ref",
+          "description": "v0.12.0+. 본 세션에 남기는 형태. summary_with_ref(기본)=요약+파일 경로만, full=원본 전체 유지 (오프로드 의미 상실, 디버깅용). 후속 Performer 에게 전달 시 Conductor 가 Transport 별 max_input_chars 상한 내에서 요약 or 원본 경로 Read 여부 결정."
         }
       }
     },

@@ -45,5 +45,7 @@ __pycache__/
 *.pyc
 *.pyo
 
-# Ensembra runtime cache (v0.9.2+ Deep Scan cache)
+# Ensembra runtime cache (v0.9.2+ Deep Scan cache, v0.12.0+ 경로 이관)
+# 신규 경로는 .claude/ensembra/cache/ — 이미 16번 라인 .claude/ensembra/ 전체 무시에 포함됨
+# 구 경로는 backward-compat fallback Read 용으로 남겨둠 (v0.13 에서 제거 예정)
 .ensembra/cache/
