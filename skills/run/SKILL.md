@@ -225,6 +225,30 @@ Phase 1 Performer 는 이 인벤토리를 **재탐색 없이** `reuse_analysis` 
 - 3단 Claude 서브에이전트 (항상 가용)
 - API 키는 MCP server env 에만 존재 (skill/agent content 노출 금지, `sensitive: true` 불변식)
 - v0.11.0+ gemini_client.py 의 outbound scrubber 로 요청 본문 내 API 키/토큰/.env 자동 마스킹
+- v0.13.0+ **429 RESOURCE_EXHAUSTED 자동 단계 다운그레이드** — `[QUOTA_EXHAUSTED]` 프리픽스 감지 시 Gemini 계열 내에서 `pro → flash → flash-lite` 순서로 자동 재시도, 체인 고갈 후에만 외부 transport 폴백. 사용자 승인 없음. `fallback.confirmation_mode: none` 만 다운그레이드 건너뛰고 기존 자동 체인 유지
+
+### 429 RESOURCE_EXHAUSTED 자동 단계 다운그레이드 (v0.13.0+)
+
+MCP transport 호출 결과 에러 메시지가 `[QUOTA_EXHAUSTED]` 프리픽스로 시작하면 **같은 Gemini 계열 내 자동 단계 다운그레이드**를 먼저 시도한 뒤에 기존 transport chain 의 다음 단계로 넘어간다. 사용자 프롬프트 없음. 정본은 CONTRACT.md §8.9.7.
+
+Conductor 의 최소 동작:
+
+1. **식별**: Performer 호출 결과 에러 본문에서 `[QUOTA_EXHAUSTED]` 프리픽스 검사
+2. **분기 조건**: `fallback.confirmation_mode != "none"` — `none` 이면 §8.8.2 자동 체인 진행 (하위호환)
+3. **다운그레이드 체인 (하드코딩)**:
+   - `gemini-2.5-pro` → `gemini-2.5-flash` (품질 경미 저하)
+   - `gemini-2.5-flash` → `gemini-2.5-flash-lite` (품질 대폭 저하)
+   - `gemini-2.5-flash-lite` → 체인 종료, 외부 transport 폴백
+4. **자동 재시도**: 각 단계 즉시 같은 MCP transport, 모델만 교체해 재호출. 사용자 승인 없음. 같은 모델에 연속 재시도 금지 (1회만)
+5. **배지 출력**: `⚡ {role}: quota downgrade {orig} → {next} (품질: {note})` / 대폭 저하 시 `⚠` / 체인 고갈 시 `✗ {role}: Gemini 계열 전체 고갈 → {next_transport} 폴백`
+6. **체인 고갈 시**: §8.8.2 루프의 다음 단계 (Ollama → Claude) 실행
+
+금지선:
+- profile yaml 의 `transport_routing` 필드 런타임 수정 금지 (매핑은 CONTRACT 표에 귀속)
+- 사용자 `/ensembra:config` 값 자동 재작성 금지
+- 같은 모델로 연속 재시도 금지 (쿼터 상태 즉시 회복 안 됨)
+- 원래 에러 메시지에서 API 키·Authorization 헤더 추출/전달 금지 (scrubber 이미 적용)
+- 사용자 승인 프롬프트 추가 금지 (v0.13.0 설계 결정)
 
 ## LLM 호출 배지
 

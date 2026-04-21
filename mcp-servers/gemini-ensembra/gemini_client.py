@@ -188,8 +188,12 @@ def call_gemini(
                 time.sleep(RETRY_BACKOFF_SEC)
                 continue
             detail = _extract_error_detail(exc, api_key)
+            # v0.13.0+: 429 RESOURCE_EXHAUSTED 는 Conductor 가 §8.9.7 자동 단계 다운그레이드로
+            # 분기해야 하므로 에러 메시지에 [QUOTA_EXHAUSTED] 프리픽스를 붙여 구별 가능하게 한다.
+            # 4xx/5xx 의 다른 케이스는 기존 포맷 유지.
+            prefix = "[QUOTA_EXHAUSTED] " if exc.code == 429 else ""
             raise RuntimeError(
-                f"Gemini API returned HTTP {exc.code}{detail}"
+                f"{prefix}Gemini API returned HTTP {exc.code}{detail}"
             ) from None
         except urllib.error.URLError as exc:
             raise RuntimeError(

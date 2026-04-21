@@ -166,8 +166,10 @@ Conductor 가 외부 LLM 호출 진행을 실시간 배지로 출력하는 v0.8.
 ### 실패 `<reason>` 마스킹
 
 레이어 2 `⚠` 폴백 배지의 `<reason>` 필드는 **짧은 요약만** 허용:
-- ✅ 허용: `HTTP 429 rate limit`, `timeout 60s`, `schema-violation: missing summary`, `transport-chain-exhausted`
+- ✅ 허용: `HTTP 429 rate limit`, `[QUOTA_EXHAUSTED] HTTP 429 (RESOURCE_EXHAUSTED: quota exceeded)` (v0.13.0+ 프리픽스), `timeout 60s`, `schema-violation: missing summary`, `transport-chain-exhausted`, `quota-downgrade pro→flash` (v0.13.0+ 자동 단계 다운그레이드 배지)
 - ❌ 금지: 원 exception 메시지의 헤더·응답 본문·전체 URL·쿼리스트링
+
+v0.13.0+ `[QUOTA_EXHAUSTED]` 프리픽스와 `error.status`/`error.message` suffix 는 `gemini_client.py` 의 `_extract_error_detail` 가 `ERROR_BODY_SNIPPET_LIMIT=240` 자로 절단하고 `api_key.replace('[REDACTED]')` 로 마스킹한 값만 포함 — 위 허용 예시는 이미 마스킹된 형태라 배지에 안전하게 표시 가능. 본문 원본은 여전히 금지.
 
 ### 단일 토글 원칙
 

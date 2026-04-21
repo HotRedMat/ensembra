@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/HotRedMat/ensembra/releases"><img src="https://img.shields.io/badge/version-0.9.3-blue" alt="version"/></a>
+  <a href="https://github.com/HotRedMat/ensembra/releases"><img src="https://img.shields.io/badge/version-0.13.0-blue" alt="version"/></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="license"/></a>
   <img src="https://img.shields.io/badge/plugin%20validate-passing-brightgreen" alt="plugin validate"/>
   <img src="https://img.shields.io/badge/verification-end--to--end-brightgreen" alt="verification"/>
@@ -176,18 +176,19 @@ Quick Select: **Maximum** (default) / Strong / Balanced / Advisory / Off. Custom
 
 ## Verification status
 
-`v0.8.0` is fully verified at the structural and behavioral level:
+Cumulative through `v0.13.0` — structural and behavioral verification history:
 
-- `claude plugin validate` passes
+- `claude plugin validate` passes on every release
 - All 9 agents invoked individually in live sessions (6 debate performers + scribe + orchestrator + final-auditor)
-- End-to-end runs on `feature`, `bugfix`, `refactor`, `security-audit`, `source-analysis` presets (v0.9.0+ adds `ops`, `ops-safe` for operations work — pending Stage 4 verification)
+- End-to-end runs on `feature`, `bugfix`, `refactor`, `security-audit`, `source-analysis`, `ops`, `ops-safe` presets (v0.9.0+ added `ops`/`ops-safe` for operations work)
 - `transfer` generated a 528-line handover document for the Ensembra project itself
 - `/ensembra:report daily|weekly` handles both populated and empty-week states
 - **Rework loop** triggered twice on an intentionally-weak email validator, converging on pass with 19 tests
 - **Halt-on-low-consensus** triggered on a deliberately controversial refactor request (0% consensus, pipeline stopped before Phase 2)
 - **Ensembra's `source-analysis` preset caught 4 real drift bugs in Ensembra's own code** — the strongest possible proof that the plugin catches real bugs
-- **All three transports verified end-to-end**: Ollama (`qwen2.5:14b`), Gemini (`gemini-2.5-flash`), Claude sub-agents
+- **All three transports verified end-to-end**: Ollama (`qwen2.5:14b`), Gemini (`gemini-2.5-flash` / `gemini-2.5-pro`), Claude sub-agents
 - **v0.9.0+**: Single MCP server `gemini-ensembra` exposes 9 role-specific tools (architect/planner/developer/security/qa/devils/scribe/final-auditor/triage). One registration, one API key, nine roles.
+- **v0.13.0+**: 429 RESOURCE_EXHAUSTED auto step-downgrade chain (`pro → flash → flash-lite`) in `gemini_client.py` — maintains Gemini-family quality continuity before falling back to external transports (CONTRACT.md §8.9.7).
 
 See [`CHANGELOG.md`](./CHANGELOG.md) for the full verification log.
 

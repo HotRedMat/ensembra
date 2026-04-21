@@ -7,6 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] — 2026-04-21 (429 자동 단계 다운그레이드 + Gemini 품질 일관성 유지)
+
+### Added — §8.9.7 429 RESOURCE_EXHAUSTED 자동 단계 다운그레이드
+
+**문제 인식**: Gemini API 가 HTTP 429 (쿼터 고갈) 를 반환하면 기존 §8.8.2 공통 실행 루프가 **자동으로 다음 transport(Ollama → Claude) 로 폴백**. pro-plan 사용자는 "Gemini 계열 품질 일관성 우선" 의도로 설정했는데, 쿼터 축 문제와 transport 장애를 같은 방식으로 처리해 **품질 계열이 의도치 않게 전환**됨. 특히 `gemini-2.5-pro` (RPM 5 / Free tier) 를 쓰는 `developer` role 이 짧은 시간 다수 호출되면 연속 쿼터 고갈 → 연속 Ollama/Claude 폴백 발생.
+
+- `CONTRACT.md §8.9.7` 신설: 429 자동 단계 다운그레이드 프로토콜 7개 서브섹션
+  - 다운그레이드 체인 하드코딩: `gemini-2.5-pro → gemini-2.5-flash → gemini-2.5-flash-lite → 외부 transport`
+  - **사용자 승인 없이 자동 진행** (매 호출마다 프롬프트 띄우지 않음 — 쿼터 축 문제의 결정적 최적 해)
+  - 체인 고갈 시에만 §8.8.2 의 기존 Ollama → Claude 폴백 경로 활성화
+  - 같은 모델에 연속 재시도 금지 (쿼터 상태 즉시 회복 안 됨)
+  - `fallback.confirmation_mode: none` 사용자는 다운그레이드 건너뛰고 기존 동작 유지 (하위호환)
+- `CONTRACT.md §8.8.2` 공통 실행 루프에 예외 1줄 추가 — `[QUOTA_EXHAUSTED]` 프리픽스 시 §8.9.7 분기.
+- 배지 포맷: `⚡ quota downgrade pro → flash (품질 표준)` / `⚠ flash → flash-lite (대폭 저하)` / `✗ Gemini 계열 전체 고갈 → ollama 폴백`
+- 로깅: `quota_downgrade_chain` 이벤트 (`final_outcome: success_at_{model}` / `escalated_to_{transport}` / `error`)
+
+### Changed — `mcp-servers/gemini-ensembra/gemini_client.py`
+
+- 429 RESOURCE_EXHAUSTED 에러 메시지에 `[QUOTA_EXHAUSTED] ` 프리픽스 추가 — Conductor 의 단순 string prefix 매칭으로 분기 식별 가능
+- 4xx/5xx 다른 케이스는 기존 포맷 유지
+- `_extract_error_detail`·`scrub_outbound`·`MAX_RETRIES_5XX` 동작 미변경 (429 는 재시도 무의미, 5xx 재시도 정책 유지)
+
+### Changed — `skills/run/SKILL.md`
+
+- "Transport 호출 규약" 하위에 **"429 RESOURCE_EXHAUSTED 자동 단계 다운그레이드 (v0.13.0+)"** 섹션 신설
+- Conductor 의 6단계 최소 동작 명시 (식별 → 분기 조건 → 다운그레이드 체인 → 자동 재시도 → 배지 → 체인 고갈 폴백)
+- 금지선 5종: profile yaml 런타임 수정 / `/ensembra:config` 자동 재작성 / 같은 모델 연속 재시도 / API 키 추출 / 사용자 승인 프롬프트 추가
+
+### Changed — `agents/architect.md` · `agents/developer.md`
+
+- Transport 섹션에 **v0.13.0+ 쿼터 고갈 시 자동 단계 다운그레이드** 서브섹션 추가.
+- `developer.md` 는 기본 모델이 `gemini-2.5-pro` (Free tier RPM 5 로 가장 타이트) 라 쿼터 고갈이 흔히 발생함을 명시.
+- 다른 agents (planner·qa·security·scribe·devils-advocate·final-auditor·orchestrator) 는 MCP(Gemini) 를 주 Transport 로 쓰지 않아 본 개선의 직접 영향 대상 아님 — 기존 문서 그대로 유지.
+
+### Changed — `SECURITY.md` §8.6.4 실패 reason 마스킹
+
+- 허용 reason 예시에 `[QUOTA_EXHAUSTED] HTTP 429 (...)` 프리픽스 형태 + `quota-downgrade pro→flash` 배지 형태 2종 추가.
+- `gemini_client.py:_extract_error_detail` 의 `ERROR_BODY_SNIPPET_LIMIT=240` 절단 + API 키 `[REDACTED]` 치환 이미 적용됨을 근거로 명시.
+- 응답 본문 원본 노출 금지선 유지 (§8.6.4 기존 원칙 변경 없음).
+
+### Changed — 버전·메타데이터 정렬
+
+- `.claude-plugin/plugin.json`: `version: "0.12.1"` → `"0.13.0"`
+- `.claude-plugin/marketplace.json`: `metadata.version` + `plugins[0].version` 모두 `0.12.1` → `0.13.0`
+- `mcp-servers/gemini-ensembra/server.py`: `SERVER_VERSION: "0.11.0"` → `"0.13.0"` (startup 로그 표시용. MCP 프로토콜 필드 `protocolVersion: "2024-11-05"` 와는 별개 축이며, 사용자 체감 일관성 위해 플러그인 버전과 정렬).
+- `README.md` 배지: `version-0.9.3-blue` → `version-0.13.0-blue` (이전 release 부터 누락된 drift 일괄 정정)
+- `README.md` Verification status 섹션: v0.9.0+ 시나리오 범위 최신화 + v0.13.0 429 자동 단계 다운그레이드 항목 추가
+
+### Deferred — `schemas/config.json` `.ensembra/cache` deprecated flag
+
+- 기존 문구 `(deprecated, v0.13 제거 예정)` → `(deprecated, v0.14 제거 예정 — v0.13.0 은 쿼터 고갈 대응에 집중한 릴리즈라 제거 작업 연기)`.
+- 실제 Read fallback 코드 제거 작업은 v0.14 로 이월. v0.13.0 스코프 팽창 방지.
+
+### Design Rationale
+
+- **자동화 우선**: 쿼터 축 문제의 최적 폴백은 "같은 계열 다운그레이드" 로 결정적. 매 호출마다 사용자 판단 불필요. 자동 단계 풀백으로 개발 흐름 중단 최소화.
+- **품질 계열 일관성**: pro-plan 사용자는 Gemini 계열 품질 일관성을 선호. flash-lite 까지 Gemini 계열 유지가 바로 Ollama/Claude 로 폴백하는 것보다 사용자 의도에 부합.
+- **config 무변경 원칙**: profile yaml·사용자 config 파일을 런타임에 수정하지 않음. 매핑은 CONTRACT.md §8.9.7.2 표에 하드코딩 귀속.
+- **하위호환**: `fallback.confirmation_mode: none` 사용자는 기존 자동 체인 그대로 유지 (다운그레이드 건너뜀).
+- **pro-plan lock 정합성**: v0.12.1 의 pro-plan lock (§19.9) 은 비용 축, 본 개선은 품질 축. 두 원칙 모두 "사용자 명시 의사 존중" 이라는 같은 철학에 기반.
+- **scrubber·재시도 정책 미변경**: 기존 방어층 유지. 본 개선은 Conductor 레이어의 분기 추가만 — MCP server 내부 재시도 로직은 건드리지 않음.
+
+### Migration (v0.12.1 → v0.13.0)
+
+- 사용자 작업 **불필요** — 429 발생 시 자동으로 `pro → flash → flash-lite` 로 단계 풀백 후에야 외부 transport 전환.
+- MCP server 프로세스 재시작 필요 (gemini_client.py `[QUOTA_EXHAUSTED]` 프리픽스 반영) — Claude Code 재시작 또는 `/mcp` 리로드.
+- 다운그레이드 건너뛰고 기존 동작 원하는 사용자: `/ensembra:config` → `fallback.confirmation_mode: none` 으로 변경.
+- `runs.jsonl` 스키마 하위호환 — `quota_downgrade_chain` 은 새 이벤트 타입 (기존 분석 코드 영향 없음).
+
 ## [0.12.1] — 2026-04-19 (pro-plan 자동 승격 금지선 불변식)
 
 ### Added — pro-plan Lock 불변식 (CONTRACT §19.3 / §19.9)

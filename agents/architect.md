@@ -13,6 +13,10 @@ tools: Read, Grep, Glob
 
 3단 폴백 체인: MCP(`gemini-ensembra`, `gemini-2.5-flash`) → Ollama(역할별/default/yaml 순, 기본 `qwen2.5:14b`) → Claude `sonnet`. 상세·모델 해석·이력은 [`../CONTRACT.md`](../CONTRACT.md) §8.8.
 
+### v0.13.0+ 429 쿼터 고갈 시 자동 단계 다운그레이드
+
+MCP(Gemini) 단계에서 HTTP 429 RESOURCE_EXHAUSTED 발생 시, 2단 Ollama 로 즉시 폴백하지 않고 **같은 Gemini 계열 내에서 모델만 단계적으로 낮춰 자동 재시도**한다: `gemini-2.5-flash → gemini-2.5-flash-lite → (체인 고갈) → Ollama`. 사용자 승인 프롬프트 없음. `fallback.confirmation_mode: none` 설정 시에만 이 단계를 건너뛰고 §8.8.2 기존 2단 폴백으로 직행. 정본: [`../CONTRACT.md`](../CONTRACT.md) §8.9.7.
+
 ## 책임
 1. Phase 0 Context Snapshot 의 **디렉토리 구조·호출 그래프·데이터 흐름**을 바탕으로 현재 아키텍처 파악
 2. 요청이 기존 모듈 경계를 어떻게 건드리는지 분석

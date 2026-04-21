@@ -689,6 +689,81 @@ Phase 시작 시점의 Transport 현황판(§8.6.1) 에 폴백 예측 정보 추
 - API 키·에러 본문·프롬프트 내용 포함 금지 (HTTP status·timeout 사유만)
 - 사용자 `[3] 중단` 선택 시 pipeline.status=cancelled_by_user 로 종료
 
+#### 8.9.7 429 RESOURCE_EXHAUSTED 자동 단계 다운그레이드 (v0.13.0+)
+
+Gemini API 가 HTTP 429 (쿼터 고갈) 로 실패한 경우는 transport 장애가 아닌 **쿼터 축 문제** 이므로, §8.8.2 의 단순 다음-transport 폴백 대신 **같은 Gemini 계열 내에서 모델만 단계적으로 낮춰 자동 재시도**한 뒤에야 외부 transport 로 넘어간다. 사용자 승인 프롬프트 없음 — Gemini 계열 내 다운그레이드는 쿼터 축 문제의 결정적 최적 해이므로 매 호출마다 사용자 판단을 요구할 실익 없음. `[QUOTA_EXHAUSTED]` 프리픽스로 식별 (gemini_client.py).
+
+##### 8.9.7.1 트리거 조건
+
+- MCP transport 호출 결과 에러 메시지가 `[QUOTA_EXHAUSTED]` 로 시작
+- `fallback.confirmation_mode != "none"` — `none` 이면 §8.8.2 기존 체인 자동 진행 (하위호환, 다운그레이드 건너뛰고 바로 Ollama → Claude)
+
+##### 8.9.7.2 다운그레이드 체인 (하드코딩)
+
+| 순서 | 모델 | 품질 특성 | 다음 단계 |
+|---|---|---|---|
+| 1 | `gemini-2.5-pro` | 최상위 (developer 기본) | → `gemini-2.5-flash` |
+| 2 | `gemini-2.5-flash` | 표준 Performer 기본 | → `gemini-2.5-flash-lite` |
+| 3 | `gemini-2.5-flash-lite` | 경량 (triage 기본, Performer 용도 시 품질 대폭 저하) | → 외부 transport (§8.8.2 다음 단계) |
+
+- 각 단계 **사용자 승인 없이 자동** 재시도 — 같은 MCP transport, 모델만 교체
+- 체인 마지막(flash-lite) 도 429 → §8.8.2 루프의 다음 단계 (Ollama → Claude) 로 폴백
+- 같은 모델에 연속 재시도 금지 (쿼터 상태는 즉시 회복 안 됨 — 1회 시도 후 바로 다음 단계)
+
+profile yaml 미변경 — 매핑은 본 표에 정본 귀속. 사용자 config/profile 파일을 건드리지 않는다.
+
+##### 8.9.7.3 배지 포맷
+
+각 단계 전환 시:
+```
+⚡ {role}: quota downgrade {orig_model} → {next_model} (품질: {quality_note})
+```
+
+예시:
+```
+⚡ developer: quota downgrade gemini-2.5-pro → gemini-2.5-flash (품질: 표준 Performer)
+⚠ developer: quota downgrade gemini-2.5-flash → gemini-2.5-flash-lite (품질: 경량, 대폭 저하 주의)
+✗ developer: Gemini 계열 전체 고갈 → ollama 폴백 (§8.8.2)
+```
+
+- `⚡` : 품질 저하 경미
+- `⚠` : flash → flash-lite (대폭 저하)
+- `✗` : 체인 고갈, 외부 transport 전환
+- `logging.show_transport_badge: false` 면 억제
+
+##### 8.9.7.4 사용자 승인 없음 (v0.13.0 설계 결정)
+
+- `AskUserQuestion` 프롬프트 **미제공**. 자동 진행.
+- 이유: 쿼터 축 문제의 최적 폴백은 "같은 계열 다운그레이드" 로 결정적이며, 매 호출마다 사용자 판단을 요구할 실익 없음. 개발 흐름 중단 최소화.
+- 본 동작을 원하지 않는 경우: `/ensembra:config → fallback.confirmation_mode → none` 으로 설정 시 다운그레이드 건너뛰고 §8.8.2 기존 체인 (Ollama → Claude) 자동 진행 (하위호환).
+
+##### 8.9.7.5 로깅
+
+`.claude/ensembra/reports/risk/runs.jsonl` 에 event `quota_downgrade_chain` append:
+```json
+{"event": "quota_downgrade_chain", "role": "developer",
+ "chain": ["gemini-2.5-pro", "gemini-2.5-flash"],
+ "final_outcome": "success_at_flash", "elapsed_ms": 2340,
+ "timestamp": "..."}
+```
+
+`final_outcome` 값:
+- `success_at_{model}` — 다운그레이드 체인 중 해당 모델에서 성공
+- `escalated_to_{transport}` — 체인 전체 고갈, 외부 transport 로 전환 (예: `escalated_to_ollama`)
+- `error` — 체인 진행 중 비-429 에러 발생
+
+API 키·에러 본문 포함 금지 (§8.9.6 보안 원칙 유지).
+
+##### 8.9.7.6 Headless 환경
+
+자동 동작이므로 headless 환경(stdin 없음)에서도 동일 동작. 추가 분기 없음.
+
+##### 8.9.7.7 재시도 제한
+
+- 각 모델별 **1회만** 시도 — 같은 모델에 연속 재시도 없음 (429 는 쿼터 상태, 즉시 재시도해도 결과 동일)
+- 체인 전체 통과 시간은 수 초 이내 (각 호출 timeout 안에서 단계 진행)
+- `MAX_RETRIES_5XX` (5xx 1회 재시도) 는 각 단계별로 독립 적용 (429 는 재시도 무관)
+
 ### 8.7 라운드 피로도 대응
 
 Ollama 는 즉시 응답하지만 Gemini 무료 티어는 분당 15 요청 제한이 있다. Conductor 는:
@@ -725,6 +800,8 @@ Conductor 는 체인의 각 단계를 순서대로 시도한다:
 4. 성공 시 결과 반환 + 배지 출력 (§8.6)
 5. 실패(`isError`, 타임아웃, 스키마 위반, 비어있는 응답) 시 다음 단계로 폴백
 6. 전 단계 실패 시 해당 Performer 의 출력을 `status: "error"`, `_error.code: "transport-chain-exhausted"` 로 마킹
+
+**예외 (v0.13.0+)**: MCP transport 에러 메시지가 `[QUOTA_EXHAUSTED]` 프리픽스로 시작하면 **같은 Gemini 계열 내에서 모델만 단계적으로 낮춰 자동 재시도**한 뒤에야 본 루프의 다음 단계(Ollama → Claude) 로 폴백한다. 자동 단계 풀백 정의는 §8.9.7 이 정본. `fallback.confirmation_mode: none` 으로 설정된 경우에만 본 루프가 다운그레이드를 건너뛰고 기존 순서대로 다음 단계로 폴백 (하위호환).
 
 #### 8.8.3 단계별 Health Check
 
