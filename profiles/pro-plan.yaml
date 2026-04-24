@@ -54,15 +54,17 @@ transport_routing:
       - { transport: "claude-subagent",                                                                 model: "sonnet",            timeout_sec: 300 }
 
   devils-advocate:
-    # Gemini flash 우선 (무료 + 빠름), haiku 는 폴백
+    # Gemini flash 우선, deepseek-r1 로컬 중간 폴백 (critical reasoning 특화), haiku 최종 폴백
     chain:
       - { transport: "mcp", mcp_server_name: "gemini-ensembra", mcp_tool_name: "devils_deliberate",    model: "gemini-2.5-flash", timeout_sec: 60 }
+      - { transport: "ollama",                                                                          model: "deepseek-r1:8b",    timeout_sec: 120 }
       - { transport: "claude-subagent",                                                                 model: "haiku",             timeout_sec: 120 }
 
   scribe:
-    # pro-plan 에서 scribe 외부 이관 금지선 완화. Gemini pro 우선
+    # pro-plan 에서 scribe 외부 이관 금지선 완화. Gemini pro 우선, qwen3:14b 로컬 중간 폴백, sonnet 최종 폴백
     chain:
       - { transport: "mcp", mcp_server_name: "gemini-ensembra", mcp_tool_name: "scribe_deliberate",    model: "gemini-2.5-pro",   timeout_sec: 120 }
+      - { transport: "ollama",                                                                          model: "qwen3:14b",         timeout_sec: 180 }
       - { transport: "claude-subagent",                                                                 model: "sonnet",            timeout_sec: 300 }
 
   final-auditor:
